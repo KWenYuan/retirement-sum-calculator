@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import html2pdf from 'html2pdf.js';
-import { BriefcaseBusiness, Calculator, ShieldCheck } from 'lucide-react';
+import { BriefcaseBusiness, ShieldCheck } from 'lucide-react';
 import { Dashboard, ScenarioTabs } from './components/Dashboard.jsx';
 import { ExportReport } from './components/ExportReport.jsx';
 import { RetirementTimeline } from './components/RetirementTimeline.jsx';
@@ -184,7 +184,7 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark"><Calculator size={24} /></div>
+          <img className="brand-logo" src="/logo.svg" alt="Advisor logo" />
           <div>
             <strong>Retirement Projection Studio</strong>
             <span>Private advisor calculator</span>

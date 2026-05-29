@@ -43,6 +43,16 @@ export function RetirementTimeline({
           '--bottom-stream-rows': bottomLaneCount,
         }}
       >
+        <div className="milestone-guide-layer" aria-hidden="true">
+          {visibleAgeGroups.map(([age]) => (
+            <span
+              key={`guide-${age}`}
+              className="milestone-guide"
+              style={{ left: ageToPercent(Number(age)) }}
+            />
+          ))}
+        </div>
+
         <div className="timeline-tooltip-layer">
           {visibleAgeGroups.map(([age, events]) => {
             const position = ((Number(age) - timeline.startAge) / span) * 100;
@@ -50,17 +60,12 @@ export function RetirementTimeline({
             const startingStreams = getStartingStreams(timeline.incomeStreams, Number(age));
             const lumpTotal = events.reduce((total, event) => total + event.amount, 0);
             const categoryClass = getCategoryClass(events[0]?.category);
-            const tooltipStyle = edgeClass === 'edge-left'
-              ? { left: 0 }
-              : edgeClass === 'edge-right'
-                ? { right: 0 }
-                : { left: ageToPercent(Number(age)) };
             return (
               <button
                 type="button"
                 key={`tooltip-${age}`}
                 className={`lump-tooltip ${edgeClass} ${categoryClass}`}
-                style={tooltipStyle}
+                style={{ left: ageToPercent(Number(age)) }}
                 onClick={() => setSelectedAge(Number(age))}
               >
                 <span className="lump-card">
@@ -212,8 +217,11 @@ function StreamBar({ stream, placement, setSelectedAge }) {
       onClick={() => setSelectedAge(stream.startAge)}
       title={`${stream.title}: ${stream.description}`}
     >
-      <span>{stream.title}</span>
-      <small>{stream.startAge}-{stream.endAge} | {stream.duration}</small>
+      <span className="income-start-marker" />
+      <span className="income-label">
+        <span className="income-title">{stream.title}</span>
+        <small className="income-subtitle">{stream.startAge}-{stream.endAge} | {stream.duration}</small>
+      </span>
     </button>
   );
 }

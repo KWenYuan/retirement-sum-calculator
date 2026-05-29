@@ -77,14 +77,13 @@ button {
   margin-top: 3px;
 }
 
-.brand-mark {
-  width: 46px;
+.brand-logo {
+  width: auto;
+  max-width: 118px;
   height: 46px;
-  display: grid;
-  place-items: center;
+  object-fit: contain;
   border-radius: 8px;
-  color: white;
-  background: linear-gradient(135deg, var(--navy), #244f83);
+  flex: 0 0 auto;
 }
 
 .sidebar-card,
@@ -967,6 +966,7 @@ textarea:focus {
 }
 
 .single-timeline {
+  position: relative;
   display: grid;
   grid-template-rows:
     132px
@@ -980,10 +980,25 @@ textarea:focus {
   background: linear-gradient(180deg, #ffffff, #fbfcfe);
 }
 
+.milestone-guide-layer {
+  position: absolute;
+  inset: 16px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.milestone-guide {
+  position: absolute;
+  top: 96px;
+  height: calc(120px + (var(--top-stream-rows, 1) * 68px));
+  border-left: 1.5px dashed rgba(77, 126, 168, 0.42);
+  transform: translateX(-50%);
+}
+
 .timeline-tooltip-layer {
   position: relative;
   height: 132px;
-  z-index: 4;
+  z-index: 5;
 }
 
 .timeline-income-layer {
@@ -991,7 +1006,7 @@ textarea:focus {
   display: grid;
   grid-auto-rows: 68px;
   gap: 0;
-  z-index: 3;
+  z-index: 4;
 }
 
 .income-lane-row {
@@ -1005,7 +1020,7 @@ textarea:focus {
   align-self: center;
   border-radius: 999px;
   background: #cfd8e5;
-  z-index: 2;
+  z-index: 5;
 }
 
 .single-age-marker {
@@ -1111,38 +1126,15 @@ textarea:focus {
 }
 
 .lump-card::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -52px;
-  width: 12px;
-  height: 52px;
-  transform: translateX(-50%);
-  border: 0;
-  border-left: 1px solid #cfd8e5;
-  background: transparent;
+  content: none;
 }
 
 .lump-tooltip.edge-left {
-  left: 0;
   transform: translateX(0);
-}
-
-.lump-tooltip.edge-left .lump-card::after {
-  left: 14px;
-  transform: none;
 }
 
 .lump-tooltip.edge-right {
-  right: 0;
-  left: auto;
-  transform: translateX(0);
-}
-
-.lump-tooltip.edge-right .lump-card::after {
-  right: 14px;
-  left: auto;
-  transform: none;
+  transform: translateX(-100%);
 }
 
 .lump-card b {
@@ -1182,6 +1174,20 @@ textarea:focus {
   background: rgba(244, 236, 216, 0.72);
   color: var(--navy);
   text-align: center;
+  z-index: 2;
+}
+
+.income-start-marker {
+  position: absolute;
+  left: 0;
+  top: -14px;
+  width: 0;
+  height: 40px;
+  border-left: 1.5px dashed rgba(77, 126, 168, 0.5);
+}
+
+.income-bracket-bottom .income-start-marker {
+  top: 2px;
 }
 
 .income-bracket-bottom {
@@ -1198,27 +1204,38 @@ textarea:focus {
   background: rgba(47, 133, 90, 0.12);
 }
 
-.income-bracket span,
-.income-bracket small {
-  position: relative;
-  top: -34px;
+.income-label {
+  position: absolute;
+  left: 50%;
+  top: -36px;
+  display: grid;
+  justify-items: center;
+  width: max-content;
+  max-width: min(220px, 180%);
+  transform: translateX(-50%);
+  pointer-events: none;
+  text-align: center;
+}
+
+.income-bracket-bottom .income-label {
+  top: 29px;
+}
+
+.income-title,
+.income-subtitle {
   display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.income-bracket-bottom span,
-.income-bracket-bottom small {
-  top: 29px;
-}
-
-.income-bracket span {
+.income-title {
   font-size: 11px;
   font-weight: 900;
 }
 
-.income-bracket small {
+.income-subtitle {
   color: var(--muted);
   font-size: 10px;
   font-weight: 800;
