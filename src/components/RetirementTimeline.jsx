@@ -13,8 +13,11 @@ export function RetirementTimeline({
   const span = Math.max(1, timeline.endAge - timeline.startAge);
   const ageToPercent = (age) => `${Math.min(100, Math.max(0, ((age - timeline.startAge) / span) * 100))}%`;
   const visibleAgeGroups = Object.entries(timeline.lumpSumsByAge || {}).sort(([a], [b]) => Number(a) - Number(b));
-  const topIncomeStreams = timeline.incomeStreams.filter((_, index) => index % 2 === 0);
-  const bottomIncomeStreams = timeline.incomeStreams.filter((_, index) => index % 2 === 1);
+  const streamRows = assignStreamRows(timeline.incomeStreams, span);
+  const topStreamRows = streamRows.filter((_, index) => index % 2 === 0);
+  const bottomStreamRows = streamRows.filter((_, index) => index % 2 === 1);
+  const topLaneCount = Math.max(1, topStreamRows.length);
+  const bottomLaneCount = Math.max(1, bottomStreamRows.length);
 
   return (
     <section className="panel retirement-timeline-panel simple-retirement-timeline">
@@ -23,17 +26,30 @@ export function RetirementTimeline({
           <h2>Retirement Timeline</h2>
           <p className="section-subtext">One line showing lump sums, income starts, and important retirement ages.</p>
         </div>
-        <div className="timeline-selected-age">
-          <span>Selected age</span>
-          <strong>{selectedAge}</strong>
+        <div className="timeline-header-tools">
+          <TimelineLegend />
+          <div className="timeline-selected-age">
+            <span>Selected age</span>
+            <strong>{selectedAge}</strong>
+          </div>
         </div>
       </div>
 
-      <div className="single-timeline" aria-label="Retirement timeline">
+      <div
+        className="single-timeline"
+        aria-label="Retirement timeline"
+        style={{
+          '--top-stream-rows': topLaneCount,
+          '--bottom-stream-rows': bottomLaneCount,
+        }}
+      >
         <div className="timeline-tooltip-layer">
           {visibleAgeGroups.map(([age, events]) => {
             const position = ((Number(age) - timeline.startAge) / span) * 100;
             const edgeClass = position < 8 ? 'edge-left' : position > 92 ? 'edge-right' : '';
+            const startingStreams = getStartingStreams(timeline.incomeStreams, Number(age));
+            const lumpTotal = events.reduce((total, event) => total + event.amount, 0);
+            const categoryClass = getCategoryClass(events[0]?.category);
             const tooltipStyle = edgeClass === 'edge-left'
               ? { left: 0 }
               : edgeClass === 'edge-right'
@@ -43,16 +59,18 @@ export function RetirementTimeline({
               <button
                 type="button"
                 key={`tooltip-${age}`}
-                className={`lump-tooltip ${edgeClass}`}
+                className={`lump-tooltip ${edgeClass} ${categoryClass}`}
                 style={tooltipStyle}
                 onClick={() => setSelectedAge(Number(age))}
               >
                 <span className="lump-card">
                   <b>Age {age}</b>
-                  {events.slice(0, 3).map((event) => (
-                    <small key={event.id}>{event.title}: {formatCurrency(event.amount)}</small>
-                  ))}
-                  {events.length > 3 && <small>+{events.length - 3} more</small>}
+                  <small>{events.length} lump sum {events.length === 1 ? 'event' : 'events'}</small>
+                  {startingStreams.length > 0 && (
+                    <small>{startingStreams.length} income {startingStreams.length === 1 ? 'stream' : 'streams'}</small>
+                  )}
+                  <strong>Total: {formatCurrency(lumpTotal)}</strong>
+                  <em>Click for details</em>
                 </span>
               </button>
             );
@@ -60,18 +78,17 @@ export function RetirementTimeline({
         </div>
 
         <div className="timeline-income-layer timeline-income-layer-top">
-          {topIncomeStreams.map((stream) => (
-            <button
-              type="button"
-              key={stream.id}
-              className="income-bracket income-bracket-top"
-              style={{ left: stream.left, width: stream.width }}
-              onClick={() => setSelectedAge(stream.startAge)}
-              title={`${stream.title}: ${stream.description}`}
-            >
-              <span>{stream.title}</span>
-              <small>{stream.startAge}-{stream.endAge} | {stream.duration} | {stream.exportAmount}</small>
-            </button>
+          {topStreamRows.map((row, rowIndex) => (
+            <div className="income-lane-row" key={`top-row-${rowIndex}`}>
+              {row.map((stream) => (
+                <StreamBar
+                  key={stream.id}
+                  stream={stream}
+                  placement="top"
+                  setSelectedAge={setSelectedAge}
+                />
+              ))}
+            </div>
           ))}
         </div>
 
@@ -96,7 +113,7 @@ export function RetirementTimeline({
             <button
               type="button"
               key={age}
-              className={`lump-group stack-${index % 2} ${edgeClass}`}
+              className={`lump-group stack-${index % 2} ${edgeClass} ${getCategoryClass(events[0]?.category)}`}
               style={{ left: ageToPercent(Number(age)) }}
               onClick={() => setSelectedAge(Number(age))}
               aria-label={`Milestones at age ${age}: ${events.map((event) => event.title).join(', ')}`}
@@ -116,18 +133,17 @@ export function RetirementTimeline({
         </div>
 
         <div className="timeline-income-layer timeline-income-layer-bottom">
-          {bottomIncomeStreams.map((stream) => (
-            <button
-              type="button"
-              key={stream.id}
-              className="income-bracket income-bracket-bottom"
-              style={{ left: stream.left, width: stream.width }}
-              onClick={() => setSelectedAge(stream.startAge)}
-              title={`${stream.title}: ${stream.description}`}
-            >
-              <span>{stream.title}</span>
-              <small>{stream.startAge}-{stream.endAge} | {stream.duration} | {stream.exportAmount}</small>
-            </button>
+          {bottomStreamRows.map((row, rowIndex) => (
+            <div className="income-lane-row" key={`bottom-row-${rowIndex}`}>
+              {row.map((stream) => (
+                <StreamBar
+                  key={stream.id}
+                  stream={stream}
+                  placement="bottom"
+                  setSelectedAge={setSelectedAge}
+                />
+              ))}
+            </div>
           ))}
         </div>
       </div>
@@ -187,4 +203,71 @@ function BreakdownLine({ label, value, strong }) {
       <strong>{formatCurrency(value)}</strong>
     </div>
   );
+}
+
+function StreamBar({ stream, placement, setSelectedAge }) {
+  return (
+    <button
+      type="button"
+      className={`income-bracket income-bracket-${placement} ${getCategoryClass(stream.category)}`}
+      style={{ left: stream.left, width: stream.width }}
+      onClick={() => setSelectedAge(stream.startAge)}
+      title={`${stream.title}: ${stream.description}`}
+    >
+      <span>{stream.title}</span>
+      <small>{stream.startAge}-{stream.endAge} | {stream.duration}</small>
+    </button>
+  );
+}
+
+function TimelineLegend() {
+  return (
+    <div className="timeline-legend" aria-label="Timeline legend">
+      <span><i className="legend-dot legend-lump" /> Lump Sum</span>
+      <span><i className="legend-line legend-income" /> Income Stream</span>
+      <span><i className="legend-dot category-cpf" /> CPF</span>
+      <span><i className="legend-dot category-policy" /> Policy</span>
+      <span><i className="legend-dot category-investment" /> Investment</span>
+      <span><i className="legend-dot category-cash" /> Cash / Savings</span>
+    </div>
+  );
+}
+
+function getStartingStreams(streams, age) {
+  return streams.filter((stream) => Math.round(stream.startAge) === Math.round(age));
+}
+
+function getCategoryClass(category = '') {
+  const normalized = category.toLowerCase();
+  if (normalized.includes('cpf')) return 'category-cpf';
+  if (normalized.includes('policy')) return 'category-policy';
+  if (normalized.includes('investment')) return 'category-investment';
+  if (normalized.includes('cash')) return 'category-cash';
+  if (normalized.includes('srs')) return 'category-income';
+  return 'category-lump';
+}
+
+function assignStreamRows(streams, span) {
+  const labelPadding = Math.max(2, span * 0.08);
+  const sortedStreams = [...streams].sort((a, b) => a.startAge - b.startAge || a.endAge - b.endAge);
+  const rows = [];
+
+  sortedStreams.forEach((stream) => {
+    const candidate = {
+      ...stream,
+      collisionStart: stream.startAge - labelPadding,
+      collisionEnd: stream.endAge + labelPadding,
+    };
+    const row = rows.find((existingRow) => existingRow.every((item) => (
+      candidate.collisionEnd < item.collisionStart || candidate.collisionStart > item.collisionEnd
+    )));
+
+    if (row) {
+      row.push(candidate);
+    } else {
+      rows.push([candidate]);
+    }
+  });
+
+  return rows;
 }

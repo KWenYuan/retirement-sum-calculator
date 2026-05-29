@@ -44,7 +44,6 @@ export function Dashboard({
   retirementPoint,
   needs,
   startLater,
-  ageDetails,
   advisorInsight,
   setAdvisorInsight,
   exportPdf,
@@ -115,25 +114,6 @@ export function Dashboard({
           value={selectedAge}
           onChange={(event) => setSelectedAge(Number(event.target.value))}
         />
-        <div className="timeline-readout">
-          <strong>Age {selectedAge}</strong>
-          <span>Total projected assets: {formatCurrency(selectedBreakdown.total)}</span>
-        </div>
-        <div className="selected-events-strip">
-          <strong>At this age</strong>
-          {[...ageDetails.milestones, ...ageDetails.incomeStreams].length === 0 ? (
-            <span>No milestone or active income stream.</span>
-          ) : (
-            <div>
-              {ageDetails.milestones.map((item) => (
-                <span key={`${item.category}-${item.title}`}>{item.title}</span>
-              ))}
-              {ageDetails.incomeStreams.map((item) => (
-                <span key={`${item.title}-${item.startAge}`}>{item.title}</span>
-              ))}
-            </div>
-          )}
-        </div>
       </section>
 
       <section className="dashboard-grid">

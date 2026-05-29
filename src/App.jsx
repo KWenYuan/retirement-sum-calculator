@@ -136,7 +136,6 @@ export default function App() {
           retirementPoint={retirementPoint}
           needs={needs}
           startLater={startLater}
-          ageDetails={ageDetails}
           advisorInsight={advisorInsight}
           setAdvisorInsight={setAdvisorInsight}
           exportPdf={exportPdf}
