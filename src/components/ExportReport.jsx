@@ -37,13 +37,6 @@ export function ExportReport({
     ['Total projected retirement amount', retirementPoint.total],
   ];
   const timelineRows = buildMilestoneRows({
-    profile,
-    cpf,
-    srs,
-    policies,
-    investments,
-    cash,
-    scenarioRate,
     retirementTimeline,
   });
   const cpf55 = buildCpf55Summary(profile, cpf);
@@ -58,6 +51,7 @@ export function ExportReport({
     return [
       investment.name || 'Investment',
       investment.riskLevel,
+      investment.withdrawalType || 'Lump sum',
       withdrawalAge,
       formatCurrency(value),
     ];
@@ -143,22 +137,23 @@ export function ExportReport({
 
       <section className="export-section page-break">
         <h2>Retirement Timeline Summary</h2>
-        <SimpleTable headers={['Age', 'Event', 'Estimated amount / income']} rows={timelineRows} />
+        <SimpleTable headers={['Age', 'Type', 'Event', 'Amount / Income', 'Duration']} rows={timelineRows} />
       </section>
 
       <section className="export-section avoid-break">
         <h2>Policy Maturity / Withdrawal Milestones</h2>
         <SimpleTable
-          headers={['Policy', 'Start age', 'Premium end age', 'Available age', 'Projected value']}
+          headers={['Policy', 'Withdrawal type', 'Start age', 'Available age', 'Projected value']}
           rows={policies.map((policy) => {
             const startAge = asNumber(policy.startAge);
             const premiumEndAge = startAge + asNumber(policy.premiumTermYears);
+            const withdrawalType = policy.withdrawalType || 'Lump sum';
             const withdrawalAge = asNumber(policy.withdrawalAge) || premiumEndAge;
             const projectedValue = projectPolicy(policy, asNumber(profile.currentAge), withdrawalAge, scenarioRate);
             return [
               policy.name || 'Policy',
+              withdrawalType,
               startAge,
-              premiumEndAge,
               withdrawalAge,
               formatCurrency(projectedValue),
             ];
@@ -169,7 +164,7 @@ export function ExportReport({
       <section className="export-section avoid-break">
         <h2>Personal Investment Summary</h2>
         <SimpleTable
-          headers={['Investment', 'Risk level', 'Available age', 'Projected value']}
+          headers={['Investment', 'Risk level', 'Timeline treatment', 'Start age', 'Projected value']}
           rows={personalInvestmentRows}
           emptyMessage="No personal investments entered."
         />
@@ -256,24 +251,12 @@ function buildSrsSummary(profile, srs) {
   };
 }
 
-function buildMilestoneRows({ profile, cpf, srs, policies, investments, cash, scenarioRate, retirementTimeline }) {
-  const rows = [];
-  retirementTimeline.milestones.forEach((milestone) => {
-    rows.push([milestone.age, milestone.title, milestone.description]);
-  });
-  retirementTimeline.incomeStreams.forEach((stream) => {
-    rows.push([stream.startAge, `${stream.title} starts`, stream.description]);
-  });
-
-  if (cpf.enabled && !rows.some((row) => row[1] === 'CPF LIFE starts')) {
-    rows.push([
-      asNumber(cpf.cpfLifePayoutStartAge) || 65,
-      'CPF LIFE starts',
-      `${formatCurrency(cpf.cpfLifeMonthlyPayout)}/month`,
-    ]);
-  }
-
-  const uniqueRows = new Map();
-  rows.forEach((row) => uniqueRows.set(row.join('|'), row));
-  return [...uniqueRows.values()].sort((a, b) => asNumber(a[0]) - asNumber(b[0]));
+function buildMilestoneRows({ retirementTimeline }) {
+  return retirementTimeline.exportRows.map((row) => [
+    row.age,
+    row.type,
+    row.event,
+    row.amountIncome,
+    row.duration,
+  ]);
 }

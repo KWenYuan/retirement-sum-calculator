@@ -12,13 +12,14 @@ export function RetirementTimeline({
 }) {
   const span = Math.max(1, timeline.endAge - timeline.startAge);
   const ageToPercent = (age) => `${Math.min(100, Math.max(0, ((age - timeline.startAge) / span) * 100))}%`;
+  const visibleAgeGroups = Object.entries(timeline.lumpSumsByAge || {}).sort(([a], [b]) => Number(a) - Number(b));
 
   return (
-    <section className="panel retirement-timeline-panel">
+    <section className="panel retirement-timeline-panel simple-retirement-timeline">
       <div className="section-header">
         <div>
           <h2>Retirement Timeline</h2>
-          <p className="section-subtext">See when assets mature, become available, or begin paying income.</p>
+          <p className="section-subtext">One line showing lump sums, income starts, and important retirement ages.</p>
         </div>
         <div className="timeline-selected-age">
           <span>Selected age</span>
@@ -26,39 +27,69 @@ export function RetirementTimeline({
         </div>
       </div>
 
-      <div className="age-axis" aria-label="Retirement age axis">
-        {timeline.ticks.map((age) => (
+      <div className="single-timeline" aria-label="Retirement timeline">
+        <div className="single-timeline-axis">
+          {timeline.ticks.map((age) => (
+            <button
+              type="button"
+              key={age}
+              className={`single-age-marker ${Math.round(selectedAge) === age ? 'active' : ''}`}
+              style={{ left: ageToPercent(age) }}
+              onClick={() => setSelectedAge(age)}
+            >
+              <span />
+              <b>{age}</b>
+            </button>
+          ))}
+
+          {timeline.incomeStreams.map((stream, index) => (
+            <button
+              type="button"
+              key={stream.id}
+              className={`income-bracket level-${index % 3}`}
+              style={{ left: stream.left, width: stream.width }}
+              onClick={() => setSelectedAge(stream.startAge)}
+              title={`${stream.title}: ${stream.description}`}
+            >
+              <span>{stream.title}</span>
+              <small>{stream.startAge}-{stream.endAge} | {stream.duration} | {stream.exportAmount}</small>
+            </button>
+          ))}
+
+          {visibleAgeGroups.map(([age, events], index) => (
+            <button
+              type="button"
+              key={age}
+              className={`lump-group stack-${index % 2}`}
+              style={{ left: ageToPercent(Number(age)) }}
+              onClick={() => setSelectedAge(Number(age))}
+            >
+              <span className="lump-dot" />
+              <span className="lump-card">
+                <b>Age {age}</b>
+                {events.slice(0, 3).map((event) => (
+                  <small key={event.id}>{event.title}: {formatCurrency(event.amount)}</small>
+                ))}
+                {events.length > 3 && <small>+{events.length - 3} more</small>}
+              </span>
+            </button>
+          ))}
+
           <button
             type="button"
-            key={age}
-            className={Math.round(selectedAge) === age ? 'active' : ''}
-            style={{ left: ageToPercent(age) }}
-            onClick={() => setSelectedAge(age)}
-          >
-            <span />
-            {age}
-          </button>
-        ))}
-        <button
-          type="button"
-          className="selected-age-marker"
-          style={{ left: ageToPercent(selectedAge) }}
-          onClick={() => setSelectedAge(selectedAge)}
-          aria-label={`Selected age ${selectedAge}`}
-        />
+            className="single-selected-marker"
+            style={{ left: ageToPercent(selectedAge) }}
+            onClick={() => setSelectedAge(selectedAge)}
+            aria-label={`Selected age ${selectedAge}`}
+          />
+        </div>
       </div>
 
-      <div className="retirement-timeline-scroll">
-        {timeline.rows.map((row) => (
-          <TimelineRow key={row.id} row={row} setSelectedAge={setSelectedAge} />
-        ))}
-      </div>
-
-      <div className="age-detail-grid">
+      <div className="age-detail-grid compact-age-details">
         <div className="age-detail-card">
           <div className="detail-title">
             <CircleDollarSign size={17} />
-            <strong>Projected Assets at Age {selectedAge}</strong>
+            <strong>Total Projected Assets at Age {selectedAge}</strong>
           </div>
           <div className="mini-breakdown">
             <BreakdownLine label="CPF" value={selectedBreakdown.cpf} />
@@ -73,22 +104,22 @@ export function RetirementTimeline({
         <div className="age-detail-card">
           <div className="detail-title">
             <CalendarClock size={17} />
-            <strong>Events and Income Streams</strong>
+            <strong>Events at Age {selectedAge}</strong>
           </div>
           <div className="event-list">
             {ageDetails.milestones.length === 0 && ageDetails.incomeStreams.length === 0 && (
               <p className="empty-events">No milestone or active income stream at this age.</p>
             )}
             {ageDetails.milestones.map((item) => (
-              <div className="event-item" key={`${item.category}-${item.title}-${item.age}`}>
-                <span>{item.category}</span>
+              <div className="event-item" key={item.id}>
+                <span>{item.category} | Lump sum</span>
                 <strong>{item.title}</strong>
                 <p>{item.description}</p>
               </div>
             ))}
             {ageDetails.incomeStreams.map((item) => (
-              <div className="event-item income-event" key={`${item.title}-${item.startAge}-${item.endAge}`}>
-                <span>Active income</span>
+              <div className="event-item income-event" key={item.id}>
+                <span>Active income | Age {item.startAge}-{item.endAge}</span>
                 <strong>{item.title}</strong>
                 <p>{item.description}</p>
               </div>
@@ -99,50 +130,6 @@ export function RetirementTimeline({
 
       <p className="timeline-note">{timelineNote}</p>
     </section>
-  );
-}
-
-function TimelineRow({ row, setSelectedAge }) {
-  const hasBar = row.startAge !== row.endAge;
-  return (
-    <div className={`timeline-row ${row.type}`}>
-      <div className="timeline-row-label">
-        <strong>{row.title}</strong>
-        {row.subtitle && <span>{row.subtitle}</span>}
-      </div>
-      <div className="timeline-track">
-        {hasBar ? (
-          <button
-            type="button"
-            className="timeline-bar"
-            style={{ left: row.left, width: row.width }}
-            onClick={() => setSelectedAge(row.endAge)}
-            title={`${row.title}, age ${row.startAge}-${row.endAge}`}
-          >
-            {row.type === 'policy' && (
-              <span className="premium-segment" style={{ width: row.premiumWidth }} />
-            )}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="timeline-dot"
-          style={{ left: row.left }}
-          onClick={() => setSelectedAge(row.endAge)}
-          title={row.milestoneLabel || row.title}
-        />
-        {row.milestoneLabel && (
-          <button
-            type="button"
-            className="timeline-milestone-label"
-            style={{ left: row.left }}
-            onClick={() => setSelectedAge(row.endAge)}
-          >
-            {row.milestoneLabel}
-          </button>
-        )}
-      </div>
-    </div>
   );
 }
 

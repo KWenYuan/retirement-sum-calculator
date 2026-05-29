@@ -39,6 +39,7 @@ export const defaultSrs = {
   withdrawalAge: 62,
   withdrawalStartAge: 62,
   withdrawalDurationYears: 10,
+  withdrawalFrequency: 'yearly',
 };
 
 export const defaultCash = {
@@ -48,6 +49,8 @@ export const defaultCash = {
   emergencyFund: 45000,
   includeEmergencyFund: false,
   plannedWithdrawalAge: 65,
+  withdrawalType: 'Lump sum',
+  withdrawalEndAge: 75,
 };
 
 export const starterPolicies = [
@@ -64,6 +67,8 @@ export const starterPolicies = [
     annualReturn: 4.5,
     useScenarioReturn: true,
     withdrawalAge: 65,
+    withdrawalType: 'Lump sum',
+    withdrawalEndAge: 75,
   },
 ];
 
@@ -78,5 +83,7 @@ export const starterInvestments = [
     riskLevel: 'Balanced',
     includeInTotal: true,
     plannedWithdrawalAge: 65,
+    withdrawalType: 'Lump sum',
+    withdrawalEndAge: 75,
   },
 ];

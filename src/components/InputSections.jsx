@@ -58,6 +58,7 @@ export function SrsSection({ srs, setSrs }) {
           <NumberField label="Planned withdrawal age" value={srs.withdrawalAge} onChange={(value) => update('withdrawalAge', value)} />
           <NumberField label="Withdrawal start age" value={srs.withdrawalStartAge} onChange={(value) => update('withdrawalStartAge', value)} />
           <NumberField label="Withdrawal duration" suffix="years" value={srs.withdrawalDurationYears} onChange={(value) => update('withdrawalDurationYears', value)} />
+          <SelectField label="Withdrawal frequency" value={srs.withdrawalFrequency} onChange={(value) => update('withdrawalFrequency', value)} options={['monthly', 'yearly']} />
         </div>
       )}
     </section>
@@ -74,7 +75,11 @@ export function CashSection({ cash, setCash }) {
         <NumberField label="Monthly cash savings" prefix="$" value={cash.monthlySavings} onChange={(value) => update('monthlySavings', value)} />
         <NumberField label="Expected annual interest" suffix="%" step={0.1} value={cash.annualInterest} onChange={(value) => update('annualInterest', value)} />
         <NumberField label="Emergency fund amount" prefix="$" value={cash.emergencyFund} onChange={(value) => update('emergencyFund', value)} />
+        <SelectField label="Timeline withdrawal type" value={cash.withdrawalType || 'Lump sum'} onChange={(value) => update('withdrawalType', value)} options={['Not shown on timeline', 'Lump sum', 'Monthly income', 'Yearly income']} />
         <NumberField label="Planned withdrawal age" value={cash.plannedWithdrawalAge} onChange={(value) => update('plannedWithdrawalAge', value)} />
+        {(cash.withdrawalType === 'Monthly income' || cash.withdrawalType === 'Yearly income') && (
+          <NumberField label="Withdrawal end age" value={cash.withdrawalEndAge} onChange={(value) => update('withdrawalEndAge', value)} />
+        )}
         <Toggle label="Include emergency fund" checked={cash.includeEmergencyFund} onChange={(value) => update('includeEmergencyFund', value)} />
       </div>
     </section>
@@ -97,6 +102,8 @@ export function PoliciesSection({ policies, setPolicies }) {
       annualReturn: 5,
       useScenarioReturn: true,
       withdrawalAge: 65,
+      withdrawalType: 'Lump sum',
+      withdrawalEndAge: 75,
     },
   ]);
   const updatePolicy = (id, key, value) => setPolicies((current) => current.map((policy) => (
@@ -130,6 +137,10 @@ export function PoliciesSection({ policies, setPolicies }) {
               <NumberField label="Premium term" suffix="years" value={policy.premiumTermYears} onChange={(value) => updatePolicy(policy.id, 'premiumTermYears', value)} />
               <NumberField label="Expected return" suffix="%" step={0.1} value={policy.annualReturn} onChange={(value) => updatePolicy(policy.id, 'annualReturn', value)} />
               <NumberField label="Withdrawal age" value={policy.withdrawalAge} onChange={(value) => updatePolicy(policy.id, 'withdrawalAge', value)} />
+              <SelectField label="Withdrawal type" value={policy.withdrawalType || 'Lump sum'} onChange={(value) => updatePolicy(policy.id, 'withdrawalType', value)} options={['Lump sum', 'Monthly income', 'Yearly income']} />
+              {(policy.withdrawalType === 'Monthly income' || policy.withdrawalType === 'Yearly income') && (
+                <NumberField label="Withdrawal end age" value={policy.withdrawalEndAge || policy.withdrawalAge + 10} onChange={(value) => updatePolicy(policy.id, 'withdrawalEndAge', value)} />
+              )}
               <Toggle label="Use scenario return" checked={policy.useScenarioReturn} onChange={(value) => updatePolicy(policy.id, 'useScenarioReturn', value)} />
             </div>
           </div>
@@ -152,6 +163,8 @@ export function InvestmentsSection({ investments, setInvestments }) {
       riskLevel: 'Balanced',
       includeInTotal: true,
       plannedWithdrawalAge: 65,
+      withdrawalType: 'Lump sum',
+      withdrawalEndAge: 75,
     },
   ]);
   const updateInvestment = (id, key, value) => setInvestments((current) => current.map((investment) => (
@@ -180,7 +193,11 @@ export function InvestmentsSection({ investments, setInvestments }) {
               <NumberField label="Monthly contribution" prefix="$" value={investment.monthlyContribution} onChange={(value) => updateInvestment(investment.id, 'monthlyContribution', value)} />
               <NumberField label="Expected return" suffix="%" step={0.1} value={investment.annualReturn} onChange={(value) => updateInvestment(investment.id, 'annualReturn', value)} />
               <SelectField label="Risk level" value={investment.riskLevel} onChange={(value) => updateInvestment(investment.id, 'riskLevel', value)} options={['Conservative', 'Balanced', 'Growth']} />
+              <SelectField label="Timeline withdrawal type" value={investment.withdrawalType || 'Lump sum'} onChange={(value) => updateInvestment(investment.id, 'withdrawalType', value)} options={['Not shown on timeline', 'Lump sum', 'Monthly income', 'Yearly income']} />
               <NumberField label="Planned withdrawal age" value={investment.plannedWithdrawalAge} onChange={(value) => updateInvestment(investment.id, 'plannedWithdrawalAge', value)} />
+              {investment.withdrawalType !== 'Lump sum' && investment.withdrawalType !== 'Not shown on timeline' && (
+                <NumberField label="Withdrawal end age" value={investment.withdrawalEndAge} onChange={(value) => updateInvestment(investment.id, 'withdrawalEndAge', value)} />
+              )}
               <Toggle label="Use scenario return" checked={investment.useScenarioReturn} onChange={(value) => updateInvestment(investment.id, 'useScenarioReturn', value)} />
               <Toggle label="Include in retirement total" checked={investment.includeInTotal} onChange={(value) => updateInvestment(investment.id, 'includeInTotal', value)} />
             </div>

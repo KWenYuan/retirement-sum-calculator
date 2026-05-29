@@ -859,6 +859,184 @@ textarea:focus {
   line-height: 1.5;
 }
 
+.simple-retirement-timeline {
+  overflow: visible;
+}
+
+.single-timeline {
+  padding: 76px 16px 104px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #fbfcfe);
+}
+
+.single-timeline-axis {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: #cfd8e5;
+}
+
+.single-age-marker {
+  position: absolute;
+  top: -8px;
+  transform: translateX(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.single-age-marker span {
+  display: block;
+  width: 2px;
+  height: 18px;
+  margin: 0 auto 5px;
+  border-radius: 999px;
+  background: #aeb9c8;
+}
+
+.single-age-marker b {
+  display: block;
+  min-width: 24px;
+}
+
+.single-age-marker.active {
+  color: var(--gold);
+}
+
+.single-age-marker.active span {
+  background: var(--gold);
+}
+
+.single-selected-marker {
+  position: absolute;
+  top: -9px;
+  width: 22px;
+  height: 22px;
+  transform: translateX(-50%);
+  border: 3px solid white;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 5px 14px rgba(16, 42, 76, 0.24);
+}
+
+.lump-group {
+  position: absolute;
+  top: -64px;
+  transform: translateX(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--navy);
+  text-align: left;
+}
+
+.lump-group.stack-1 {
+  top: 28px;
+}
+
+.lump-dot {
+  position: absolute;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, 54px);
+  border: 3px solid white;
+  border-radius: 50%;
+  background: var(--navy);
+  box-shadow: 0 4px 12px rgba(16, 42, 76, 0.22);
+}
+
+.lump-group.stack-1 .lump-dot {
+  transform: translate(-50%, -30px);
+}
+
+.lump-card {
+  display: grid;
+  gap: 2px;
+  width: 158px;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 10px 24px rgba(16, 42, 76, 0.08);
+}
+
+.lump-card b {
+  color: var(--gold);
+  font-size: 11px;
+}
+
+.lump-card small {
+  color: #344054;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.income-bracket {
+  position: absolute;
+  top: -48px;
+  min-width: 70px;
+  height: 28px;
+  border: 0;
+  border-top: 3px solid var(--gold);
+  border-left: 2px solid var(--gold);
+  border-right: 2px solid var(--gold);
+  border-radius: 8px 8px 0 0;
+  background: rgba(244, 236, 216, 0.72);
+  color: var(--navy);
+  text-align: center;
+}
+
+.income-bracket.level-1 {
+  top: 22px;
+  border-top: 0;
+  border-bottom: 3px solid #78a083;
+  border-left-color: #78a083;
+  border-right-color: #78a083;
+  border-radius: 0 0 8px 8px;
+  background: rgba(120, 160, 131, 0.14);
+}
+
+.income-bracket.level-2 {
+  top: -78px;
+  border-top-color: #4d7ea8;
+  border-left-color: #4d7ea8;
+  border-right-color: #4d7ea8;
+  background: rgba(77, 126, 168, 0.13);
+}
+
+.income-bracket span,
+.income-bracket small {
+  position: relative;
+  top: -38px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-bracket.level-1 span,
+.income-bracket.level-1 small {
+  top: 25px;
+}
+
+.income-bracket span {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.income-bracket small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.compact-age-details {
+  margin-top: 14px;
+}
+
 .pdf-summary {
   margin: 0 26px 18px;
   padding: 18px;

@@ -160,34 +160,76 @@ export const buildRetirementTimeline = (state) => {
   const endAge = getRetirementTimelineEndAge(state.profile);
   const years = Math.max(1, endAge - startAge);
   const toPercent = (age) => `${Math.min(100, Math.max(0, ((asNumber(age) - startAge) / years) * 100))}%`;
-  const rows = [];
-  const milestones = [];
+  const lumpSums = [];
   const incomeStreams = [];
+  const addLumpSum = ({ age, title, amount, category, description }) => {
+    const eventAge = asNumber(age);
+    if (!eventAge || eventAge < startAge || eventAge > endAge) return;
+    lumpSums.push({
+      id: `${category}-${title}-${eventAge}-${lumpSums.length}`,
+      age: eventAge,
+      title,
+      amount,
+      category,
+      description: description || `${title}: ${formatCurrency(amount)}`,
+      left: toPercent(eventAge),
+      exportType: 'Lump Sum',
+      exportAmount: formatCurrency(amount),
+      exportDuration: 'One-time',
+    });
+  };
+  const addIncomeStream = ({ start, end, title, category, amountPerPeriod, frequency, description, durationLabel }) => {
+    const streamStart = Math.max(startAge, asNumber(start));
+    const streamEnd = Math.min(endAge, asNumber(end));
+    if (!streamStart || !streamEnd || streamEnd <= streamStart) return;
+    const durationYears = Math.max(1, streamEnd - streamStart);
+    const periodLabel = frequency === 'monthly' ? '/month' : '/year';
+    incomeStreams.push({
+      id: `${category}-${title}-${streamStart}-${incomeStreams.length}`,
+      startAge: streamStart,
+      endAge: streamEnd,
+      title,
+      category,
+      amountPerPeriod,
+      frequency,
+      description: description || `${formatCurrency(amountPerPeriod)}${periodLabel}`,
+      duration: durationLabel || `${durationYears} years`,
+      left: toPercent(streamStart),
+      width: `calc(${toPercent(streamEnd)} - ${toPercent(streamStart)})`,
+      exportType: 'Income',
+      exportAmount: `${formatCurrency(amountPerPeriod)}${periodLabel}`,
+      exportDuration: durationLabel || `${durationYears} years`,
+    });
+  };
 
   state.policies.forEach((policy) => {
-    const start = asNumber(policy.startAge) || startAge;
-    const premiumEndAge = start + asNumber(policy.premiumTermYears);
+    const policyStartAge = asNumber(policy.startAge) || startAge;
+    const premiumEndAge = policyStartAge + asNumber(policy.premiumTermYears);
     const withdrawalAge = asNumber(policy.withdrawalAge) || premiumEndAge;
     const projectedValue = projectPolicy(policy, startAge, withdrawalAge, state.scenarioRate);
-    rows.push({
-      id: `policy-${policy.id}`,
-      type: 'policy',
-      title: policy.name || 'Policy',
-      subtitle: `Start ${start} | Premium paying ${start}-${premiumEndAge} | Available ${withdrawalAge}`,
-      startAge: start,
-      endAge: withdrawalAge,
-      premiumEndAge,
-      projectedValue,
-      left: toPercent(start),
-      width: `calc(${toPercent(withdrawalAge)} - ${toPercent(start)})`,
-      premiumWidth: `${Math.min(100, Math.max(0, ((premiumEndAge - start) / Math.max(1, withdrawalAge - start)) * 100))}%`,
-      milestoneLabel: `${withdrawalAge === premiumEndAge ? 'Matures' : `Projected value at ${withdrawalAge}`}: ${formatCurrency(projectedValue)}`,
-    });
-    milestones.push({
-      age: withdrawalAge,
-      title: policy.name || 'Policy',
-      description: `${withdrawalAge === premiumEndAge ? 'Matures' : 'Available'}: ${formatCurrency(projectedValue)}`,
+    const type = policy.withdrawalType || 'Lump sum';
+    if (type === 'Lump sum') {
+      addLumpSum({
+        age: withdrawalAge,
+        title: policy.name || 'Policy',
+        amount: projectedValue,
+        category: 'Policy',
+        description: `Lump sum: ${formatCurrency(projectedValue)}`,
+      });
+      return;
+    }
+    const end = Math.max(withdrawalAge + 1, asNumber(policy.withdrawalEndAge) || withdrawalAge + 10);
+    const duration = Math.max(1, end - withdrawalAge);
+    const frequency = type === 'Monthly income' ? 'monthly' : 'yearly';
+    const amount = frequency === 'monthly' ? projectedValue / (duration * 12) : projectedValue / duration;
+    addIncomeStream({
+      start: withdrawalAge,
+      end,
+      title: policy.name || 'Policy income',
       category: 'Policy',
+      amountPerPeriod: amount,
+      frequency,
+      description: `${type}: ${formatCurrency(amount)}${frequency === 'monthly' ? '/month' : '/year'}`,
     });
   });
 
@@ -197,41 +239,25 @@ export const buildRetirementTimeline = (state) => {
     const frs = asNumber(state.cpf.frsAmountAt55);
     const excess = cpfOaSaAt55 - frs;
     if (cpf55Age >= startAge && cpf55Age <= endAge) {
-      rows.push({
-        id: 'cpf-55',
-        type: 'cpf-milestone',
-        title: 'CPF 55 milestone',
-        startAge: cpf55Age,
-        endAge: cpf55Age,
-        left: toPercent(cpf55Age),
-        milestoneLabel: excess >= 0
-          ? `Estimated excess withdrawable: ${formatCurrency(excess)}`
-          : `Estimated FRS shortfall: ${formatCurrency(Math.abs(excess))}`,
-      });
-      milestones.push({
+      addLumpSum({
         age: cpf55Age,
         title: 'CPF 55 milestone',
+        amount: Math.abs(excess),
         category: 'CPF',
         description: `Projected OA + SA: ${formatCurrency(cpfOaSaAt55)}. FRS set aside: ${formatCurrency(frs)}. ${excess >= 0 ? 'Estimated excess withdrawable' : 'Estimated FRS shortfall'}: ${formatCurrency(Math.abs(excess))}.`,
       });
     }
 
     const payoutStart = asNumber(state.cpf.cpfLifePayoutStartAge) || 65;
-    rows.push({
-      id: 'cpf-life',
-      type: 'income',
+    addIncomeStream({
+      start: payoutStart,
+      end: endAge,
       title: `CPF LIFE: ${formatCurrency(state.cpf.cpfLifeMonthlyPayout)}/month`,
-      subtitle: `Recurring income from age ${payoutStart}`,
-      startAge: payoutStart,
-      endAge,
-      left: toPercent(payoutStart),
-      width: `calc(${toPercent(endAge)} - ${toPercent(payoutStart)})`,
-    });
-    incomeStreams.push({
-      startAge: payoutStart,
-      endAge,
-      title: 'CPF LIFE',
-      description: `${formatCurrency(state.cpf.cpfLifeMonthlyPayout)}/month from age ${payoutStart}`,
+      category: 'CPF',
+      amountPerPeriod: state.cpf.cpfLifeMonthlyPayout,
+      frequency: 'monthly',
+      description: `From age ${payoutStart}. ${formatCurrency(state.cpf.cpfLifeMonthlyPayout)}/month. Lifetime income.`,
+      durationLabel: 'Lifetime',
     });
   }
 
@@ -241,79 +267,95 @@ export const buildRetirementTimeline = (state) => {
     const withdrawalEnd = withdrawalStart + duration;
     const projectedSrs = projectSrs(state.srs, startAge, withdrawalStart);
     const annualWithdrawal = projectedSrs / duration;
-    rows.push({
-      id: 'srs-withdrawal',
-      type: 'srs',
-      title: `SRS withdrawal: ${formatCurrency(annualWithdrawal)}/year`,
-      subtitle: `${formatCurrency(annualWithdrawal / 12)}/month from age ${withdrawalStart}-${withdrawalEnd}`,
-      startAge: withdrawalStart,
-      endAge: withdrawalEnd,
-      left: toPercent(withdrawalStart),
-      width: `calc(${toPercent(withdrawalEnd)} - ${toPercent(withdrawalStart)})`,
-    });
-    incomeStreams.push({
-      startAge: withdrawalStart,
-      endAge: withdrawalEnd,
+    const frequency = state.srs.withdrawalFrequency || 'yearly';
+    const amount = frequency === 'monthly' ? annualWithdrawal / 12 : annualWithdrawal;
+    addIncomeStream({
+      start: withdrawalStart,
+      end: withdrawalEnd,
       title: 'SRS withdrawal',
-      description: `${formatCurrency(annualWithdrawal)}/year or ${formatCurrency(annualWithdrawal / 12)}/month`,
-    });
-    milestones.push({
-      age: withdrawalStart,
-      title: 'SRS withdrawal starts',
       category: 'SRS',
-      description: `Projected SRS value: ${formatCurrency(projectedSrs)}.`,
+      amountPerPeriod: amount,
+      frequency,
+      description: `Age ${withdrawalStart}-${withdrawalEnd}. ${duration} years. ${formatCurrency(annualWithdrawal)}/year or ${formatCurrency(annualWithdrawal / 12)}/month.`,
     });
   }
 
   state.investments.forEach((investment) => {
+    const type = investment.withdrawalType || 'Lump sum';
+    if (type === 'Not shown on timeline') return;
     const withdrawalAge = asNumber(investment.plannedWithdrawalAge);
     if (!withdrawalAge) return;
     const yearsToWithdrawal = Math.max(0, withdrawalAge - startAge);
     const projectedValue = projectInvestment(investment, yearsToWithdrawal, state.scenarioRate);
-    rows.push({
-      id: `investment-${investment.id}`,
-      type: 'investment',
-      title: investment.name || 'Investment available',
-      startAge: withdrawalAge,
-      endAge: withdrawalAge,
-      left: toPercent(withdrawalAge),
-      milestoneLabel: `Investment available: ${formatCurrency(projectedValue)}`,
-    });
-    milestones.push({
-      age: withdrawalAge,
-      title: investment.name || 'Investment',
+    if (type === 'Lump sum') {
+      addLumpSum({
+        age: withdrawalAge,
+        title: investment.name || 'Investment',
+        amount: projectedValue,
+        category: 'Investment',
+        description: `Lump sum: ${formatCurrency(projectedValue)}`,
+      });
+      return;
+    }
+    const end = Math.max(withdrawalAge + 1, asNumber(investment.withdrawalEndAge) || withdrawalAge + 10);
+    const duration = Math.max(1, end - withdrawalAge);
+    const frequency = type === 'Monthly income' ? 'monthly' : 'yearly';
+    const amount = frequency === 'monthly' ? projectedValue / (duration * 12) : projectedValue / duration;
+    addIncomeStream({
+      start: withdrawalAge,
+      end,
+      title: investment.name || 'Investment income',
       category: 'Investment',
-      description: `Investment available: ${formatCurrency(projectedValue)}.`,
+      amountPerPeriod: amount,
+      frequency,
+      description: `${type}: ${formatCurrency(amount)}${frequency === 'monthly' ? '/month' : '/year'}`,
     });
   });
 
+  const cashType = state.cash.withdrawalType || 'Lump sum';
   const cashWithdrawalAge = asNumber(state.cash.plannedWithdrawalAge);
-  if (cashWithdrawalAge) {
+  if (cashWithdrawalAge && cashType !== 'Not shown on timeline') {
     const projectedCash = projectCash(state.cash, Math.max(0, cashWithdrawalAge - startAge));
-    rows.push({
-      id: 'cash-available',
-      type: 'cash',
-      title: 'Cash / savings available',
-      startAge: cashWithdrawalAge,
-      endAge: cashWithdrawalAge,
-      left: toPercent(cashWithdrawalAge),
-      milestoneLabel: `Cash available: ${formatCurrency(projectedCash)}`,
-    });
-    milestones.push({
-      age: cashWithdrawalAge,
-      title: 'Cash available',
-      category: 'Cash',
-      description: `Cash available: ${formatCurrency(projectedCash)}.`,
-    });
+    if (cashType === 'Lump sum') {
+      addLumpSum({
+        age: cashWithdrawalAge,
+        title: 'Cash / savings',
+        amount: projectedCash,
+        category: 'Cash',
+        description: `Lump sum: ${formatCurrency(projectedCash)}`,
+      });
+    } else {
+      const end = Math.max(cashWithdrawalAge + 1, asNumber(state.cash.withdrawalEndAge) || cashWithdrawalAge + 10);
+      const duration = Math.max(1, end - cashWithdrawalAge);
+      const frequency = cashType === 'Monthly income' ? 'monthly' : 'yearly';
+      const amount = frequency === 'monthly' ? projectedCash / (duration * 12) : projectedCash / duration;
+      addIncomeStream({
+        start: cashWithdrawalAge,
+        end,
+        title: 'Cash / savings income',
+        category: 'Cash',
+        amountPerPeriod: amount,
+        frequency,
+        description: `${cashType}: ${formatCurrency(amount)}${frequency === 'monthly' ? '/month' : '/year'}`,
+      });
+    }
   }
+
+  const lumpSumsByAge = lumpSums.reduce((groups, event) => {
+    const age = Math.round(event.age);
+    groups[age] = groups[age] ? [...groups[age], event] : [event];
+    return groups;
+  }, {});
 
   return {
     startAge,
     endAge,
     ticks: buildAgeTicks(startAge, endAge),
-    rows,
-    milestones,
+    lumpSums,
+    lumpSumsByAge,
+    milestones: lumpSums,
     incomeStreams,
+    exportRows: buildTimelineExportRows(lumpSums, incomeStreams),
   };
 };
 
@@ -322,6 +364,26 @@ const buildAgeTicks = (startAge, endAge) => {
   for (let age = startAge; age <= endAge; age += 5) ticks.push(age);
   if (!ticks.includes(endAge)) ticks.push(endAge);
   return ticks;
+};
+
+const buildTimelineExportRows = (lumpSums, incomeStreams) => {
+  const lumpRows = lumpSums.map((event) => ({
+    age: event.age,
+    type: 'Lump Sum',
+    event: event.title,
+    amountIncome: event.exportAmount,
+    duration: event.exportDuration,
+    description: event.description,
+  }));
+  const incomeRows = incomeStreams.map((stream) => ({
+    age: stream.startAge,
+    type: 'Income',
+    event: `${stream.title} starts`,
+    amountIncome: stream.exportAmount,
+    duration: stream.exportDuration,
+    description: stream.description,
+  }));
+  return [...lumpRows, ...incomeRows].sort((a, b) => asNumber(a.age) - asNumber(b.age));
 };
 
 export const getAgeTimelineDetails = (retirementTimeline, age) => {
