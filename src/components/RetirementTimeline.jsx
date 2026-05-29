@@ -7,7 +7,6 @@ export function RetirementTimeline({
   timeline,
   selectedAge,
   setSelectedAge,
-  selectedBreakdown,
   ageDetails,
 }) {
   const span = Math.max(1, timeline.endAge - timeline.startAge);
@@ -18,6 +17,7 @@ export function RetirementTimeline({
   const bottomStreamRows = streamRows.filter((_, index) => index % 2 === 1);
   const topLaneCount = Math.max(1, topStreamRows.length);
   const bottomLaneCount = Math.max(1, bottomStreamRows.length);
+  const payoutSummary = getPayoutSummary(ageDetails);
 
   return (
     <section className="panel retirement-timeline-panel simple-retirement-timeline">
@@ -149,18 +149,16 @@ export function RetirementTimeline({
       </div>
 
       <div className="age-detail-grid compact-age-details">
-        <div className="age-detail-card">
+        <div className="age-detail-card payout-summary-card">
           <div className="detail-title">
             <CircleDollarSign size={17} />
-            <strong>Total Projected Assets at Age {selectedAge}</strong>
+            <strong>What You Receive at Age {selectedAge}</strong>
           </div>
-          <div className="mini-breakdown">
-            <BreakdownLine label="CPF" value={selectedBreakdown.cpf} />
-            <BreakdownLine label="SRS" value={selectedBreakdown.srs} />
-            <BreakdownLine label="Policies" value={selectedBreakdown.policies} />
-            <BreakdownLine label="Investments" value={selectedBreakdown.investments} />
-            <BreakdownLine label="Cash" value={selectedBreakdown.cash} />
-            <BreakdownLine label="Total" value={selectedBreakdown.total} strong />
+          <div className="payout-summary-list">
+            <PayoutLine label="Total Lump Sum" value={formatCurrency(payoutSummary.lumpSum)} />
+            <PayoutLine label="Total Monthly Income" value={`${formatCurrency(payoutSummary.monthlyIncome)}/month`} />
+            <PayoutLine label="Total Yearly Income" value={`${formatCurrency(payoutSummary.yearlyIncome)}/year`} />
+            <PayoutLine label="Combined Monthly Equivalent" value={`${formatCurrency(payoutSummary.combinedMonthlyEquivalent)}/month`} strong />
           </div>
         </div>
 
@@ -196,11 +194,11 @@ export function RetirementTimeline({
   );
 }
 
-function BreakdownLine({ label, value, strong }) {
+function PayoutLine({ label, value, strong }) {
   return (
-    <div className={strong ? 'strong' : ''}>
+    <div className={strong ? 'highlight' : ''}>
       <span>{label}</span>
-      <strong>{formatCurrency(value)}</strong>
+      <strong>{value}</strong>
     </div>
   );
 }
@@ -235,6 +233,23 @@ function TimelineLegend() {
 
 function getStartingStreams(streams, age) {
   return streams.filter((stream) => Math.round(stream.startAge) === Math.round(age));
+}
+
+function getPayoutSummary(ageDetails) {
+  const lumpSum = ageDetails.milestones.reduce((total, event) => total + (event.amount || 0), 0);
+  const monthlyIncome = ageDetails.incomeStreams
+    .filter((stream) => stream.frequency === 'monthly')
+    .reduce((total, stream) => total + (stream.amountPerPeriod || 0), 0);
+  const yearlyIncome = ageDetails.incomeStreams
+    .filter((stream) => stream.frequency !== 'monthly')
+    .reduce((total, stream) => total + (stream.amountPerPeriod || 0), 0);
+
+  return {
+    lumpSum,
+    monthlyIncome,
+    yearlyIncome,
+    combinedMonthlyEquivalent: monthlyIncome + yearlyIncome / 12,
+  };
 }
 
 function getCategoryClass(category = '') {

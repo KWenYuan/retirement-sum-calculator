@@ -148,7 +148,6 @@ export default function App() {
             timeline={retirementTimeline}
             selectedAge={clampedSelectedAge}
             setSelectedAge={setSelectedAge}
-            selectedBreakdown={selectedBreakdown}
             ageDetails={ageDetails}
           />
         </div>
