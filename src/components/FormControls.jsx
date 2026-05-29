@@ -1,4 +1,20 @@
 export function NumberField({ label, value, onChange, prefix, suffix, step = 1, min = 0 }) {
+  const handleChange = (event) => {
+    onChange(event.target.value);
+  };
+
+  const handleBlur = (event) => {
+    const nextValue = event.target.value;
+
+    if (nextValue === '') {
+      onChange('');
+      return;
+    }
+
+    const parsed = Number(nextValue);
+    onChange(Number.isFinite(parsed) ? parsed : '');
+  };
+
   return (
     <label className="field">
       <span>{label}</span>
@@ -8,8 +24,9 @@ export function NumberField({ label, value, onChange, prefix, suffix, step = 1, 
           type="number"
           min={min}
           step={step}
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
+          value={value ?? ''}
+          onChange={handleChange}
+          onBlur={handleBlur}
         />
         {suffix && <b>{suffix}</b>}
       </div>

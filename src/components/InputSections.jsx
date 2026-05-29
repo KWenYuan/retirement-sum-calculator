@@ -139,7 +139,7 @@ export function PoliciesSection({ policies, setPolicies }) {
               <NumberField label="Withdrawal age" value={policy.withdrawalAge} onChange={(value) => updatePolicy(policy.id, 'withdrawalAge', value)} />
               <SelectField label="Withdrawal type" value={policy.withdrawalType || 'Lump sum'} onChange={(value) => updatePolicy(policy.id, 'withdrawalType', value)} options={['Lump sum', 'Monthly income', 'Yearly income']} />
               {(policy.withdrawalType === 'Monthly income' || policy.withdrawalType === 'Yearly income') && (
-                <NumberField label="Withdrawal end age" value={policy.withdrawalEndAge || policy.withdrawalAge + 10} onChange={(value) => updatePolicy(policy.id, 'withdrawalEndAge', value)} />
+                <NumberField label="Withdrawal end age" value={policy.withdrawalEndAge} onChange={(value) => updatePolicy(policy.id, 'withdrawalEndAge', value)} />
               )}
               <Toggle label="Use scenario return" checked={policy.useScenarioReturn} onChange={(value) => updatePolicy(policy.id, 'useScenarioReturn', value)} />
             </div>
