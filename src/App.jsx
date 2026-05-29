@@ -184,7 +184,6 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <img className="brand-logo" src="/logo.png" alt="Advisor logo" />
           <div>
             <strong>Retirement Projection Studio</strong>
             <span>Private advisor calculator</span>

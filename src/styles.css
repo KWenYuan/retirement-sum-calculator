@@ -606,12 +606,21 @@ textarea:focus {
 }
 
 .timeline-selected-age {
-  min-width: 112px;
-  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 220px;
+  max-width: 100%;
+  gap: 14px;
+  padding: 10px 12px 10px 14px;
   border-radius: 8px;
   background: var(--navy);
   color: white;
-  text-align: center;
+  text-align: left;
+}
+
+.selected-age-copy {
+  min-width: 70px;
 }
 
 .timeline-selected-age span {
@@ -626,6 +635,16 @@ textarea:focus {
   margin-top: 2px;
   font-size: 26px;
   line-height: 1;
+}
+
+.selected-age-logo {
+  width: auto;
+  max-width: 102px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  flex: 0 0 auto;
 }
 
 .age-axis {
@@ -1007,6 +1026,7 @@ textarea:focus {
   grid-auto-rows: 68px;
   gap: 0;
   z-index: 4;
+  overflow: visible;
 }
 
 .income-lane-row {
@@ -1180,14 +1200,42 @@ textarea:focus {
 .income-start-marker {
   position: absolute;
   left: 0;
-  top: -14px;
+  top: var(--stream-connector-top, 0);
   width: 0;
-  height: 40px;
+  height: var(--stream-connector-height, 40px);
   border-left: 1.5px dashed rgba(77, 126, 168, 0.5);
+  pointer-events: none;
+  z-index: 1;
 }
 
-.income-bracket-bottom .income-start-marker {
-  top: 2px;
+.income-start-marker::before,
+.income-start-marker::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  transform: translateX(-50%);
+  border: 2px solid white;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 2px 8px rgba(16, 42, 76, 0.16);
+}
+
+.income-start-marker::before {
+  top: 0;
+}
+
+.income-start-marker::after {
+  bottom: 0;
+}
+
+.income-bracket-top .income-start-marker::before {
+  display: none;
+}
+
+.income-bracket-bottom .income-start-marker::after {
+  display: none;
 }
 
 .income-bracket-bottom {

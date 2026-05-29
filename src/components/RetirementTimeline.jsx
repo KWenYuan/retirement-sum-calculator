@@ -12,9 +12,14 @@ export function RetirementTimeline({
   const span = Math.max(1, timeline.endAge - timeline.startAge);
   const ageToPercent = (age) => `${Math.min(100, Math.max(0, ((age - timeline.startAge) / span) * 100))}%`;
   const visibleAgeGroups = Object.entries(timeline.lumpSumsByAge || {}).sort(([a], [b]) => Number(a) - Number(b));
-  const streamRows = assignStreamRows(timeline.incomeStreams, span);
-  const topStreamRows = streamRows.filter((_, index) => index % 2 === 0);
-  const bottomStreamRows = streamRows.filter((_, index) => index % 2 === 1);
+  const topStreamRows = assignStreamRows(
+    timeline.incomeStreams.filter((stream) => isUpperStream(stream)),
+    span,
+  );
+  const bottomStreamRows = assignStreamRows(
+    timeline.incomeStreams.filter((stream) => !isUpperStream(stream)),
+    span,
+  );
   const topLaneCount = Math.max(1, topStreamRows.length);
   const bottomLaneCount = Math.max(1, bottomStreamRows.length);
   const payoutSummary = getPayoutSummary(ageDetails);
@@ -29,8 +34,11 @@ export function RetirementTimeline({
         <div className="timeline-header-tools">
           <TimelineLegend />
           <div className="timeline-selected-age">
-            <span>Selected age</span>
-            <strong>{selectedAge}</strong>
+            <div className="selected-age-copy">
+              <span>Selected age</span>
+              <strong>{selectedAge}</strong>
+            </div>
+            <img className="selected-age-logo" src="/logo.png" alt="Advisor logo" />
           </div>
         </div>
       </div>
@@ -90,6 +98,8 @@ export function RetirementTimeline({
                   key={stream.id}
                   stream={stream}
                   placement="top"
+                  rowIndex={rowIndex}
+                  rowCount={topLaneCount}
                   setSelectedAge={setSelectedAge}
                 />
               ))}
@@ -145,6 +155,8 @@ export function RetirementTimeline({
                   key={stream.id}
                   stream={stream}
                   placement="bottom"
+                  rowIndex={rowIndex}
+                  rowCount={bottomLaneCount}
                   setSelectedAge={setSelectedAge}
                 />
               ))}
@@ -208,12 +220,21 @@ function PayoutLine({ label, value, strong }) {
   );
 }
 
-function StreamBar({ stream, placement, setSelectedAge }) {
+function StreamBar({ stream, placement, rowIndex, rowCount, setSelectedAge }) {
+  const connectorHeight = placement === 'top'
+    ? (rowCount - rowIndex - 1) * 68 + 86
+    : rowIndex * 68 + 56;
+
   return (
     <button
       type="button"
       className={`income-bracket income-bracket-${placement} ${getCategoryClass(stream.category)}`}
-      style={{ left: stream.left, width: stream.width }}
+      style={{
+        left: stream.left,
+        width: stream.width,
+        '--stream-connector-height': `${connectorHeight}px`,
+        '--stream-connector-top': placement === 'top' ? '0px' : `-${connectorHeight}px`,
+      }}
       onClick={() => setSelectedAge(stream.startAge)}
       title={`${stream.title}: ${stream.description}`}
     >
@@ -268,6 +289,12 @@ function getCategoryClass(category = '') {
   if (normalized.includes('cash')) return 'category-cash';
   if (normalized.includes('srs')) return 'category-income';
   return 'category-lump';
+}
+
+function isUpperStream(stream) {
+  const category = (stream.category || '').toLowerCase();
+  const title = (stream.title || '').toLowerCase();
+  return category.includes('srs') || title.includes('srs');
 }
 
 function assignStreamRows(streams, span) {
