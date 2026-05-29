@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Download, FileText, TrendingUp } from 'lucide-react';
+import { Database, Download, FileText, FolderUp, Trash2, TrendingUp } from 'lucide-react';
 import { formatCurrency } from '../utils/projections.js';
 
 const COLORS = ['#15345f', '#c49a43', '#4d7ea8', '#78a083', '#d9a441'];
@@ -47,8 +47,13 @@ export function Dashboard({
   advisorInsight,
   setAdvisorInsight,
   exportPdf,
+  exportClientData,
+  importClientData,
+  clearSavedData,
   isExporting,
   exportError,
+  dataMessage,
+  dataError,
 }) {
   const timelineEndAge = timeline[timeline.length - 1]?.age || profile.retirementAge;
   const breakdownData = [
@@ -71,13 +76,36 @@ export function Dashboard({
           <h1>Retirement projection at age {profile.retirementAge}</h1>
           <p className="hero-subtitle">A meeting-ready view of CPF, SRS, policies, investments and cash against the client’s retirement income target.</p>
         </div>
-        <button className="export-button" type="button" onClick={exportPdf} disabled={isExporting}>
-          <Download size={18} />
-          {isExporting ? 'Generating PDF...' : 'Export PDF'}
-        </button>
       </section>
 
       {exportError && <div className="export-error">{exportError}</div>}
+      {dataError && <div className="export-error">{dataError}</div>}
+      {dataMessage && <div className="data-message">{dataMessage}</div>}
+
+      <section className="panel data-export-panel">
+        <div>
+          <h2>Data & Export</h2>
+          <p>Export a client PDF report, or save and restore calculator inputs for future reviews.</p>
+        </div>
+        <div className="data-export-actions">
+          <button className="export-button" type="button" onClick={exportPdf} disabled={isExporting}>
+            <Download size={18} />
+            {isExporting ? 'Generating PDF...' : 'Export PDF'}
+          </button>
+          <button className="ghost-button data-action-button" type="button" onClick={exportClientData}>
+            <Database size={16} />
+            Export Client Data
+          </button>
+          <button className="ghost-button data-action-button" type="button" onClick={importClientData}>
+            <FolderUp size={16} />
+            Import Client Data
+          </button>
+          <button className="ghost-button data-action-button subtle" type="button" onClick={clearSavedData}>
+            <Trash2 size={16} />
+            Clear Saved Data
+          </button>
+        </div>
+      </section>
 
       <section className="metric-grid">
         <MetricCard label="Projected retirement amount" value={formatCurrency(retirementPoint.total)} tone="navy" />

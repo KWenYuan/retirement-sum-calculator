@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import html2pdf from 'html2pdf.js';
 import { BriefcaseBusiness, Calculator, ShieldCheck } from 'lucide-react';
 import { Dashboard, ScenarioTabs } from './components/Dashboard.jsx';
@@ -22,6 +22,16 @@ import {
   starterPolicies,
 } from './data/defaults.js';
 import {
+  buildClientDataState,
+  buildExportPayload,
+  clearSavedClientData,
+  defaultAdvisorInsight,
+  downloadClientData,
+  importClientData,
+  loadClientDataFromStorage,
+  saveClientDataToStorage,
+} from './utils/clientData.js';
+import {
   buildRetirementTimeline,
   buildTimeline,
   calculateAtAge,
@@ -35,18 +45,22 @@ import {
 const disclaimer = 'This calculator is for illustration and discussion purposes only. Figures are based on assumptions entered and are not guaranteed. Actual returns, CPF rules, SRS treatment, policy values, fees, withdrawals, taxation and market conditions may differ. Please refer to official policy documents and CPF/SRS guidelines where applicable.';
 
 export default function App() {
-  const [profile, setProfile] = useState(defaultProfile);
-  const [cpf, setCpf] = useState(defaultCpf);
-  const [srs, setSrs] = useState(defaultSrs);
-  const [policies, setPolicies] = useState(starterPolicies);
-  const [investments, setInvestments] = useState(starterInvestments);
-  const [cash, setCash] = useState(defaultCash);
-  const [scenario, setScenario] = useState('balanced');
-  const [selectedAge, setSelectedAge] = useState(defaultProfile.retirementAge);
-  const [advisorInsight, setAdvisorInsight] = useState('Client has strong income but most wealth is held in cash. Main opportunity is to improve long-term compounding and reduce inflation drag.');
+  const savedState = useMemo(() => loadClientDataFromStorage(), []);
+  const [profile, setProfile] = useState(savedState?.profile || defaultProfile);
+  const [cpf, setCpf] = useState(savedState?.cpf || defaultCpf);
+  const [srs, setSrs] = useState(savedState?.srs || defaultSrs);
+  const [policies, setPolicies] = useState(savedState?.policies || starterPolicies);
+  const [investments, setInvestments] = useState(savedState?.investments || starterInvestments);
+  const [cash, setCash] = useState(savedState?.cash || defaultCash);
+  const [scenario, setScenario] = useState(savedState?.scenario || 'balanced');
+  const [selectedAge, setSelectedAge] = useState(savedState?.selectedAge || defaultProfile.retirementAge);
+  const [advisorInsight, setAdvisorInsight] = useState(savedState?.advisorInsight || defaultAdvisorInsight);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [dataMessage, setDataMessage] = useState('');
+  const [dataError, setDataError] = useState('');
   const exportReportRef = useRef(null);
+  const importInputRef = useRef(null);
 
   const scenarioRate = SCENARIOS[scenario].returnRate;
   const retirementTimelineEndAge = getRetirementTimelineEndAge(profile);
@@ -70,6 +84,21 @@ export default function App() {
   );
 
   const exportDate = new Date().toLocaleDateString('en-CA');
+  const clientDataState = useMemo(() => buildClientDataState({
+    profile,
+    cpf,
+    srs,
+    policies,
+    investments,
+    cash,
+    scenario,
+    selectedAge: clampedSelectedAge,
+    advisorInsight,
+  }), [profile, cpf, srs, policies, investments, cash, scenario, clampedSelectedAge, advisorInsight]);
+
+  useEffect(() => {
+    saveClientDataToStorage(clientDataState);
+  }, [clientDataState]);
 
   const exportPdf = async () => {
     if (!exportReportRef.current || isExporting) return;
@@ -97,6 +126,58 @@ export default function App() {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const exportClientData = () => {
+    setDataError('');
+    const payload = buildExportPayload(clientDataState);
+    downloadClientData(payload, profile.clientName, exportDate);
+    setDataMessage('Client data exported successfully.');
+  };
+
+  const requestImportClientData = () => {
+    setDataError('');
+    setDataMessage('');
+    importInputRef.current?.click();
+  };
+
+  const handleImportClientData = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const shouldContinue = window.confirm('Importing this file will replace the current calculator inputs. Continue?');
+    if (!shouldContinue) return;
+
+    try {
+      const restoredState = await importClientData(file);
+      if (!restoredState) return;
+      restoreState(restoredState);
+      setDataMessage('Client data imported successfully.');
+      setDataError('');
+    } catch (error) {
+      console.error('Client data import failed:', error);
+      setDataError(error.message || 'Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
+      setDataMessage('');
+    }
+  };
+
+  const clearBrowserSavedData = () => {
+    clearSavedClientData();
+    setDataMessage('Saved browser data cleared.');
+    setDataError('');
+  };
+
+  const restoreState = (state) => {
+    setProfile(state.profile);
+    setCpf(state.cpf);
+    setSrs(state.srs);
+    setPolicies(state.policies);
+    setInvestments(state.investments);
+    setCash(state.cash);
+    setScenario(state.scenario);
+    setSelectedAge(state.selectedAge);
+    setAdvisorInsight(state.advisorInsight);
   };
 
   return (
@@ -139,8 +220,13 @@ export default function App() {
           advisorInsight={advisorInsight}
           setAdvisorInsight={setAdvisorInsight}
           exportPdf={exportPdf}
+          exportClientData={exportClientData}
+          importClientData={requestImportClientData}
+          clearSavedData={clearBrowserSavedData}
           isExporting={isExporting}
           exportError={exportError}
+          dataMessage={dataMessage}
+          dataError={dataError}
         />
 
         <div className="dashboard timeline-placement">
@@ -192,6 +278,14 @@ export default function App() {
           />
         </div>
       </div>
+
+      <input
+        ref={importInputRef}
+        className="hidden-file-input"
+        type="file"
+        accept="application/json,.json"
+        onChange={handleImportClientData}
+      />
     </div>
   );
 }
