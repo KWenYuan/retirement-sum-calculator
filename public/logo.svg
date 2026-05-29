@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 64" role="img" aria-labelledby="title">
-  <title>Advisor Logo</title>
-  <rect width="180" height="64" rx="10" fill="#102a4c"/>
-  <path d="M28 44V25h8v19h-8Zm14 0V16h8v28h-8Zm14 0V31h8v13h-8Z" fill="#c49a43"/>
-  <path d="M24 48h46" stroke="#f4ecd8" stroke-width="3" stroke-linecap="round"/>
-  <text x="82" y="29" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">YOUR</text>
-  <text x="82" y="45" fill="#f4ecd8" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">LOGO</text>
-</svg>
