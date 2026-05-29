@@ -864,10 +864,17 @@ textarea:focus {
 }
 
 .single-timeline {
-  padding: 76px 16px 104px;
+  padding: 0 16px 104px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, #ffffff, #fbfcfe);
+}
+
+.timeline-tooltip-layer {
+  position: relative;
+  height: 118px;
+  margin-bottom: 28px;
+  z-index: 4;
 }
 
 .single-timeline-axis {
@@ -875,6 +882,7 @@ textarea:focus {
   height: 4px;
   border-radius: 999px;
   background: #cfd8e5;
+  z-index: 2;
 }
 
 .single-age-marker {
@@ -924,43 +932,93 @@ textarea:focus {
 
 .lump-group {
   position: absolute;
-  top: -64px;
+  top: 0;
+  width: 0;
+  height: 0;
   transform: translateX(-50%);
   border: 0;
   background: transparent;
   color: var(--navy);
   text-align: left;
+  z-index: 6;
 }
 
 .lump-group.stack-1 {
-  top: 28px;
+  top: 0;
 }
 
 .lump-dot {
   position: absolute;
+  top: -9px;
   left: 50%;
   width: 18px;
   height: 18px;
-  transform: translate(-50%, 54px);
+  transform: translateX(-50%);
   border: 3px solid white;
   border-radius: 50%;
   background: var(--navy);
   box-shadow: 0 4px 12px rgba(16, 42, 76, 0.22);
+  z-index: 2;
 }
 
-.lump-group.stack-1 .lump-dot {
-  transform: translate(-50%, -30px);
+.lump-tooltip {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 158px;
+  border: 0;
+  background: transparent;
+  color: var(--navy);
+  text-align: left;
+  z-index: 8;
 }
 
 .lump-card {
+  position: relative;
   display: grid;
   gap: 2px;
-  width: 158px;
+  width: 100%;
+  max-width: min(178px, 42vw);
   padding: 8px 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: white;
   box-shadow: 0 10px 24px rgba(16, 42, 76, 0.08);
+}
+
+.lump-card::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: white;
+}
+
+.lump-tooltip.edge-left {
+  left: 0;
+  transform: translateX(0);
+}
+
+.lump-tooltip.edge-left .lump-card::after {
+  left: 14px;
+  transform: rotate(45deg);
+}
+
+.lump-tooltip.edge-right {
+  right: 0;
+  left: auto;
+  transform: translateX(0);
+}
+
+.lump-tooltip.edge-right .lump-card::after {
+  right: 14px;
+  left: auto;
+  transform: rotate(45deg);
 }
 
 .lump-card b {

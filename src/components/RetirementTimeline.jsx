@@ -28,6 +28,35 @@ export function RetirementTimeline({
       </div>
 
       <div className="single-timeline" aria-label="Retirement timeline">
+        <div className="timeline-tooltip-layer">
+          {visibleAgeGroups.map(([age, events]) => {
+            const position = ((Number(age) - timeline.startAge) / span) * 100;
+            const edgeClass = position < 8 ? 'edge-left' : position > 92 ? 'edge-right' : '';
+            const tooltipStyle = edgeClass === 'edge-left'
+              ? { left: 0 }
+              : edgeClass === 'edge-right'
+                ? { right: 0 }
+                : { left: ageToPercent(Number(age)) };
+            return (
+              <button
+                type="button"
+                key={`tooltip-${age}`}
+                className={`lump-tooltip ${edgeClass}`}
+                style={tooltipStyle}
+                onClick={() => setSelectedAge(Number(age))}
+              >
+                <span className="lump-card">
+                  <b>Age {age}</b>
+                  {events.slice(0, 3).map((event) => (
+                    <small key={event.id}>{event.title}: {formatCurrency(event.amount)}</small>
+                  ))}
+                  {events.length > 3 && <small>+{events.length - 3} more</small>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         <div className="single-timeline-axis">
           {timeline.ticks.map((age) => (
             <button
@@ -56,24 +85,22 @@ export function RetirementTimeline({
             </button>
           ))}
 
-          {visibleAgeGroups.map(([age, events], index) => (
+          {visibleAgeGroups.map(([age, events], index) => {
+            const position = ((Number(age) - timeline.startAge) / span) * 100;
+            const edgeClass = position < 8 ? 'edge-left' : position > 92 ? 'edge-right' : '';
+            return (
             <button
               type="button"
               key={age}
-              className={`lump-group stack-${index % 2}`}
+              className={`lump-group stack-${index % 2} ${edgeClass}`}
               style={{ left: ageToPercent(Number(age)) }}
               onClick={() => setSelectedAge(Number(age))}
+              aria-label={`Milestones at age ${age}: ${events.map((event) => event.title).join(', ')}`}
             >
               <span className="lump-dot" />
-              <span className="lump-card">
-                <b>Age {age}</b>
-                {events.slice(0, 3).map((event) => (
-                  <small key={event.id}>{event.title}: {formatCurrency(event.amount)}</small>
-                ))}
-                {events.length > 3 && <small>+{events.length - 3} more</small>}
-              </span>
             </button>
-          ))}
+            );
+          })}
 
           <button
             type="button"
