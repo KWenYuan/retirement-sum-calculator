@@ -13,6 +13,8 @@ export function RetirementTimeline({
   const span = Math.max(1, timeline.endAge - timeline.startAge);
   const ageToPercent = (age) => `${Math.min(100, Math.max(0, ((age - timeline.startAge) / span) * 100))}%`;
   const visibleAgeGroups = Object.entries(timeline.lumpSumsByAge || {}).sort(([a], [b]) => Number(a) - Number(b));
+  const topIncomeStreams = timeline.incomeStreams.filter((_, index) => index % 2 === 0);
+  const bottomIncomeStreams = timeline.incomeStreams.filter((_, index) => index % 2 === 1);
 
   return (
     <section className="panel retirement-timeline-panel simple-retirement-timeline">
@@ -57,6 +59,22 @@ export function RetirementTimeline({
           })}
         </div>
 
+        <div className="timeline-income-layer timeline-income-layer-top">
+          {topIncomeStreams.map((stream) => (
+            <button
+              type="button"
+              key={stream.id}
+              className="income-bracket income-bracket-top"
+              style={{ left: stream.left, width: stream.width }}
+              onClick={() => setSelectedAge(stream.startAge)}
+              title={`${stream.title}: ${stream.description}`}
+            >
+              <span>{stream.title}</span>
+              <small>{stream.startAge}-{stream.endAge} | {stream.duration} | {stream.exportAmount}</small>
+            </button>
+          ))}
+        </div>
+
         <div className="single-timeline-axis">
           {timeline.ticks.map((age) => (
             <button
@@ -68,20 +86,6 @@ export function RetirementTimeline({
             >
               <span />
               <b>{age}</b>
-            </button>
-          ))}
-
-          {timeline.incomeStreams.map((stream, index) => (
-            <button
-              type="button"
-              key={stream.id}
-              className={`income-bracket level-${index % 3}`}
-              style={{ left: stream.left, width: stream.width }}
-              onClick={() => setSelectedAge(stream.startAge)}
-              title={`${stream.title}: ${stream.description}`}
-            >
-              <span>{stream.title}</span>
-              <small>{stream.startAge}-{stream.endAge} | {stream.duration} | {stream.exportAmount}</small>
             </button>
           ))}
 
@@ -109,6 +113,22 @@ export function RetirementTimeline({
             onClick={() => setSelectedAge(selectedAge)}
             aria-label={`Selected age ${selectedAge}`}
           />
+        </div>
+
+        <div className="timeline-income-layer timeline-income-layer-bottom">
+          {bottomIncomeStreams.map((stream) => (
+            <button
+              type="button"
+              key={stream.id}
+              className="income-bracket income-bracket-bottom"
+              style={{ left: stream.left, width: stream.width }}
+              onClick={() => setSelectedAge(stream.startAge)}
+              title={`${stream.title}: ${stream.description}`}
+            >
+              <span>{stream.title}</span>
+              <small>{stream.startAge}-{stream.endAge} | {stream.duration} | {stream.exportAmount}</small>
+            </button>
+          ))}
         </div>
       </div>
 

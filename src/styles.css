@@ -864,7 +864,10 @@ textarea:focus {
 }
 
 .single-timeline {
-  padding: 0 16px 104px;
+  display: grid;
+  grid-template-rows: 132px 78px 64px 78px;
+  gap: 16px;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: linear-gradient(180deg, #ffffff, #fbfcfe);
@@ -872,14 +875,20 @@ textarea:focus {
 
 .timeline-tooltip-layer {
   position: relative;
-  height: 118px;
-  margin-bottom: 28px;
+  height: 132px;
   z-index: 4;
+}
+
+.timeline-income-layer {
+  position: relative;
+  height: 78px;
+  z-index: 3;
 }
 
 .single-timeline-axis {
   position: relative;
   height: 4px;
+  align-self: center;
   border-radius: 999px;
   background: #cfd8e5;
   z-index: 2;
@@ -963,7 +972,7 @@ textarea:focus {
 
 .lump-tooltip {
   position: absolute;
-  bottom: 0;
+  top: 0;
   transform: translateX(-50%);
   width: 158px;
   border: 0;
@@ -990,13 +999,13 @@ textarea:focus {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: -8px;
+  bottom: -52px;
   width: 12px;
-  height: 12px;
-  transform: translateX(-50%) rotate(45deg);
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  background: white;
+  height: 52px;
+  transform: translateX(-50%);
+  border: 0;
+  border-left: 1px solid #cfd8e5;
+  background: transparent;
 }
 
 .lump-tooltip.edge-left {
@@ -1006,7 +1015,7 @@ textarea:focus {
 
 .lump-tooltip.edge-left .lump-card::after {
   left: 14px;
-  transform: rotate(45deg);
+  transform: none;
 }
 
 .lump-tooltip.edge-right {
@@ -1018,7 +1027,7 @@ textarea:focus {
 .lump-tooltip.edge-right .lump-card::after {
   right: 14px;
   left: auto;
-  transform: rotate(45deg);
+  transform: none;
 }
 
 .lump-card b {
@@ -1034,7 +1043,7 @@ textarea:focus {
 
 .income-bracket {
   position: absolute;
-  top: -48px;
+  top: 24px;
   min-width: 70px;
   height: 28px;
   border: 0;
@@ -1047,8 +1056,8 @@ textarea:focus {
   text-align: center;
 }
 
-.income-bracket.level-1 {
-  top: 22px;
+.income-bracket-bottom {
+  top: 0;
   border-top: 0;
   border-bottom: 3px solid #78a083;
   border-left-color: #78a083;
@@ -1057,8 +1066,7 @@ textarea:focus {
   background: rgba(120, 160, 131, 0.14);
 }
 
-.income-bracket.level-2 {
-  top: -78px;
+.income-bracket:nth-child(3n) {
   border-top-color: #4d7ea8;
   border-left-color: #4d7ea8;
   border-right-color: #4d7ea8;
@@ -1068,16 +1076,16 @@ textarea:focus {
 .income-bracket span,
 .income-bracket small {
   position: relative;
-  top: -38px;
+  top: -35px;
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.income-bracket.level-1 span,
-.income-bracket.level-1 small {
-  top: 25px;
+.income-bracket-bottom span,
+.income-bracket-bottom small {
+  top: 28px;
 }
 
 .income-bracket span {
