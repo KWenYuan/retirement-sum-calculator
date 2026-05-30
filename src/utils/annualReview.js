@@ -116,14 +116,14 @@ export function buildChangedSinceLastReview(previousReviewData, currentState, co
   compareNamedItems(changes, 'Investments', previous.investments || [], currentState.investments || [], 'investment', [
     ['currentValue', 'value', 'currency'],
     ['monthlyContribution', 'contribution', 'currency'],
-    ['plannedWithdrawalAge', 'withdrawal age', 'number'],
+    ['withdrawalStartAge', 'withdrawal age', 'number'],
+    ['withdrawalEndAge', 'withdrawal end age', 'number'],
     ['withdrawalType', 'withdrawal type', 'text'],
   ]);
 
   addNumberChange(changes, 'Cash / Savings', 'Cash balance', previous.cash.currentSavings, currentState.cash.currentSavings, 'currency');
   addNumberChange(changes, 'Cash / Savings', 'Monthly cash savings', previous.cash.monthlySavings, currentState.cash.monthlySavings, 'currency');
   addNumberChange(changes, 'Cash / Savings', 'Emergency fund amount', previous.cash.emergencyFund, currentState.cash.emergencyFund, 'currency');
-  addTextChange(changes, 'Cash / Savings', 'Cash withdrawal settings', previous.cash.withdrawalType, currentState.cash.withdrawalType);
   addTextChange(
     changes,
     'Cash / Savings',

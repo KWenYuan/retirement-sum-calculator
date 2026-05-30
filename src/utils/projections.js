@@ -247,7 +247,7 @@ const projectPolicyWithContributionDelay = (policy, currentAge, targetAge, scena
 
   if (structure.withdrawalType === 'Keep invested / no withdrawal yet') return accumulatedValue;
   if (structure.withdrawalType === 'Lump sum') {
-    return selectedAge > structure.withdrawalStartAge ? 0 : accumulatedValue;
+    return selectedAge >= structure.withdrawalStartAge ? 0 : accumulatedValue;
   }
   if (selectedAge <= structure.withdrawalStartAge) return accumulatedValue;
 
@@ -273,6 +273,20 @@ const projectPolicyWithContributionDelay = (policy, currentAge, targetAge, scena
   }
 
   return remainingValue;
+};
+
+export const projectPolicyAccumulatedAtAge = (policy, currentAge, targetAge, scenarioRate) => {
+  const structure = getPolicyStructure(policy, targetAge);
+  const annualPremium = asNumber(policy.premiumAmount) * (frequencyMultiplier[policy.premiumFrequency] || 12);
+  const effectiveRate = getEffectiveRate(policy.annualReturn, policy.useScenarioReturn, scenarioRate);
+  return projectPolicyAccumulatedValue({
+    policy,
+    structure,
+    currentAge: asNumber(currentAge),
+    targetAge: asNumber(targetAge),
+    annualPremium,
+    effectiveRate,
+  });
 };
 
 const projectPolicyAccumulatedValue = ({
@@ -328,13 +342,70 @@ export const getPolicyStructure = (policy, fallbackAge = 65) => {
 };
 
 export const projectInvestment = (investment, years, scenarioRate) => {
-  const effectiveRate = getEffectiveRate(investment.annualReturn, investment.useScenarioReturn, scenarioRate);
+  const effectiveRate = asNumber(investment.annualReturn);
   return futureValueWithMonthlyContributions(
     investment.currentValue,
     investment.monthlyContribution,
     effectiveRate,
     years,
   );
+};
+
+export const getInvestmentStructure = (investment = {}, fallbackAge = 65, fallbackDuration = 10) => {
+  const withdrawalType = investment.withdrawalType === 'Not shown on timeline'
+    ? 'Keep invested / no withdrawal'
+    : (investment.withdrawalType || 'Lump sum');
+  const withdrawalStartAge = asNumber(
+    investment.withdrawalStartAge ??
+    investment.plannedWithdrawalAge ??
+    fallbackAge,
+  ) || fallbackAge;
+  const withdrawalEndAge = asNumber(investment.withdrawalEndAge) || withdrawalStartAge + fallbackDuration;
+  const withdrawalDuration = Math.max(1, withdrawalEndAge - withdrawalStartAge);
+
+  return {
+    withdrawalType,
+    withdrawalStartAge,
+    withdrawalEndAge,
+    withdrawalDuration,
+  };
+};
+
+export const projectInvestmentAccumulatedAtAge = (investment, currentAge, targetAge, scenarioRate) => (
+  projectInvestment(investment, Math.max(0, asNumber(targetAge) - asNumber(currentAge)), scenarioRate)
+);
+
+export const projectInvestmentAtAge = (investment, currentAge, targetAge, scenarioRate, fallbackDuration = 10) => {
+  const selectedAge = asNumber(targetAge);
+  const structure = getInvestmentStructure(investment, selectedAge, fallbackDuration);
+  const accumulatedValue = projectInvestmentAccumulatedAtAge(investment, currentAge, selectedAge, scenarioRate);
+
+  if (structure.withdrawalType === 'Keep invested / no withdrawal') return accumulatedValue;
+  if (structure.withdrawalType === 'Lump sum') {
+    return selectedAge >= structure.withdrawalStartAge ? 0 : accumulatedValue;
+  }
+  if (selectedAge <= structure.withdrawalStartAge) return accumulatedValue;
+
+  const valueAtWithdrawalStart = projectInvestmentAccumulatedAtAge(
+    investment,
+    currentAge,
+    structure.withdrawalStartAge,
+    scenarioRate,
+  );
+  const annualPayout = valueAtWithdrawalStart / structure.withdrawalDuration;
+  const drawdownYears = Math.min(
+    Math.max(0, Math.floor(selectedAge - structure.withdrawalStartAge)),
+    structure.withdrawalDuration,
+  );
+  let remainingValue = valueAtWithdrawalStart;
+  const effectiveRate = asNumber(investment.annualReturn);
+  const annualRate = rate(effectiveRate);
+
+  for (let year = 0; year < drawdownYears; year += 1) {
+    remainingValue = Math.max(0, remainingValue * (1 + annualRate) - annualPayout);
+  }
+
+  return remainingValue;
 };
 
 export const projectCash = (cash, years) => {
@@ -344,6 +415,33 @@ export const projectCash = (cash, years) => {
 };
 
 export const isCashIncludedInProjection = (cash = {}) => cash.includeCashInProjection !== false;
+
+export const calculateTransferredLumpSumsAtAge = ({ profile, policies = [], investments = [], cash = {}, scenarioRate, age }) => {
+  const selectedAge = asNumber(age);
+  const currentAge = asNumber(profile.currentAge);
+  const growTransferredCash = (value, withdrawalAge) => compoundAnnual(
+    value,
+    cash.annualInterest,
+    Math.max(0, selectedAge - asNumber(withdrawalAge)),
+  );
+
+  const policyTransfers = policies.reduce((total, policy) => {
+    const structure = getPolicyStructure(policy, profile.retirementAge);
+    if (structure.withdrawalType !== 'Lump sum' || selectedAge < structure.withdrawalStartAge) return total;
+    const lumpSumValue = projectPolicyAccumulatedAtAge(policy, currentAge, structure.withdrawalStartAge, scenarioRate);
+    return total + growTransferredCash(lumpSumValue, structure.withdrawalStartAge);
+  }, 0);
+
+  const investmentTransfers = investments.reduce((total, investment) => {
+    if (!investment.includeInTotal) return total;
+    const structure = getInvestmentStructure(investment, profile.retirementAge, profile.retirementDuration);
+    if (structure.withdrawalType !== 'Lump sum' || selectedAge < structure.withdrawalStartAge) return total;
+    const lumpSumValue = projectInvestmentAccumulatedAtAge(investment, currentAge, structure.withdrawalStartAge, scenarioRate);
+    return total + growTransferredCash(lumpSumValue, structure.withdrawalStartAge);
+  }, 0);
+
+  return policyTransfers + investmentTransfers;
+};
 
 export const calculateAtAge = ({ profile, cpf, srs, policies, investments, cash, scenarioRate, age }) => {
   const years = Math.max(0, asNumber(age) - asNumber(profile.currentAge));
@@ -356,13 +454,14 @@ export const calculateAtAge = ({ profile, cpf, srs, policies, investments, cash,
     0,
   );
   const investmentValue = investments.reduce((total, investment) => (
-    total + (investment.includeInTotal ? projectInvestment(investment, years, scenarioRate) : 0)
+    total + (investment.includeInTotal ? projectInvestmentAtAge(investment, profile.currentAge, age, scenarioRate, profile.retirementDuration) : 0)
   ), 0);
   const visibleInvestmentValue = investments.reduce(
-    (total, investment) => total + projectInvestment(investment, years, scenarioRate),
+    (total, investment) => total + projectInvestmentAtAge(investment, profile.currentAge, age, scenarioRate, profile.retirementDuration),
     0,
   );
-  const cashValue = isCashIncludedInProjection(cash) ? projectCash(cash, years) : 0;
+  const transferredLumpSums = calculateTransferredLumpSumsAtAge({ profile, policies, investments, cash, scenarioRate, age });
+  const cashValue = (isCashIncludedInProjection(cash) ? projectCash(cash, years) : 0) + transferredLumpSums;
   const total = cpfValue + srsValue + policyValue + investmentValue + cashValue;
 
   return {
@@ -440,7 +539,7 @@ export const buildRetirementTimeline = (state) => {
   state.policies.forEach((policy) => {
     const structure = getPolicyStructure(policy, state.profile.retirementAge);
     const withdrawalAge = structure.withdrawalStartAge || structure.holdingUntilAge;
-    const projectedValue = projectPolicy(policy, startAge, withdrawalAge, state.scenarioRate);
+    const projectedValue = projectPolicyAccumulatedAtAge(policy, startAge, withdrawalAge, state.scenarioRate);
     const type = structure.withdrawalType;
     if (type === 'Keep invested / no withdrawal yet') return;
     if (type === 'Lump sum') {
@@ -506,12 +605,13 @@ export const buildRetirementTimeline = (state) => {
   }
 
   state.investments.forEach((investment) => {
-    const type = investment.withdrawalType || 'Lump sum';
-    if (type === 'Not shown on timeline') return;
-    const withdrawalAge = asNumber(investment.plannedWithdrawalAge);
+    if (!investment.includeInTotal) return;
+    const structure = getInvestmentStructure(investment, state.profile.retirementAge, state.profile.retirementDuration);
+    const type = structure.withdrawalType;
+    if (type === 'Keep invested / no withdrawal') return;
+    const withdrawalAge = structure.withdrawalStartAge;
     if (!withdrawalAge) return;
-    const yearsToWithdrawal = Math.max(0, withdrawalAge - startAge);
-    const projectedValue = projectInvestment(investment, yearsToWithdrawal, state.scenarioRate);
+    const projectedValue = projectInvestmentAccumulatedAtAge(investment, startAge, withdrawalAge, state.scenarioRate);
     if (type === 'Lump sum') {
       addLumpSum({
         age: withdrawalAge,
@@ -522,7 +622,7 @@ export const buildRetirementTimeline = (state) => {
       });
       return;
     }
-    const end = Math.max(withdrawalAge + 1, asNumber(investment.withdrawalEndAge) || withdrawalAge + 10);
+    const end = Math.max(withdrawalAge + 1, structure.withdrawalEndAge);
     const duration = Math.max(1, end - withdrawalAge);
     const frequency = type === 'Monthly income' ? 'monthly' : 'yearly';
     const amount = frequency === 'monthly' ? projectedValue / (duration * 12) : projectedValue / duration;
@@ -536,35 +636,6 @@ export const buildRetirementTimeline = (state) => {
       description: `${type}: ${formatCurrency(amount)}${frequency === 'monthly' ? '/month' : '/year'}`,
     });
   });
-
-  const cashType = state.cash.withdrawalType || 'Lump sum';
-  const cashWithdrawalAge = asNumber(state.cash.plannedWithdrawalAge);
-  if (isCashIncludedInProjection(state.cash) && cashWithdrawalAge && cashType !== 'Not shown on timeline') {
-    const projectedCash = projectCash(state.cash, Math.max(0, cashWithdrawalAge - startAge));
-    if (cashType === 'Lump sum') {
-      addLumpSum({
-        age: cashWithdrawalAge,
-        title: 'Cash / savings',
-        amount: projectedCash,
-        category: 'Cash',
-        description: `Lump sum: ${formatCurrency(projectedCash)}`,
-      });
-    } else {
-      const end = Math.max(cashWithdrawalAge + 1, asNumber(state.cash.withdrawalEndAge) || cashWithdrawalAge + 10);
-      const duration = Math.max(1, end - cashWithdrawalAge);
-      const frequency = cashType === 'Monthly income' ? 'monthly' : 'yearly';
-      const amount = frequency === 'monthly' ? projectedCash / (duration * 12) : projectedCash / duration;
-      addIncomeStream({
-        start: cashWithdrawalAge,
-        end,
-        title: 'Cash / savings income',
-        category: 'Cash',
-        amountPerPeriod: amount,
-        frequency,
-        description: `${cashType}: ${formatCurrency(amount)}${frequency === 'monthly' ? '/month' : '/year'}`,
-      });
-    }
-  }
 
   const lumpSumsByAge = lumpSums.reduce((groups, event) => {
     const age = Math.round(event.age);

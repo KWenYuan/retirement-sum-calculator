@@ -19,9 +19,8 @@ import {
   formatCurrency,
   hasCpfProjectionData,
   isCashIncludedInProjection,
-  projectCash,
   projectCpfAtAge,
-  projectInvestment,
+  projectInvestmentAtAge,
   projectPolicy,
   projectSrs,
 } from '../utils/projections.js';
@@ -383,11 +382,12 @@ function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash,
       color: INVESTMENT_COLORS[index % INVESTMENT_COLORS.length],
     });
   });
-  if (isCashIncludedInProjection(cash)) series.push({ key: 'cash', name: 'Cash / Savings', color: ASSET_COLORS.cash });
+  if (isCashIncludedInProjection(cash) || timeline.some((point) => Number(point.cash) > 0)) {
+    series.push({ key: 'cash', name: 'Cash / Savings', color: ASSET_COLORS.cash });
+  }
 
   const chartData = timeline.map((point) => {
     const age = Number(point.age);
-    const years = Math.max(0, age - Number(profile.currentAge));
     const row = { age, total: point.total };
     if (hasCpfProjectionData(cpf)) row.cpf = projectCpfAtAge(cpf, profile.currentAge, age);
     if (srs.enabled) row.srs = projectSrs(srs, Number(profile.currentAge), age);
@@ -396,9 +396,9 @@ function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash,
     });
     investments.forEach((investment) => {
       if (!investment.includeInTotal) return;
-      row[`investment_${investment.id}`] = projectInvestment(investment, years, scenarioRate);
+      row[`investment_${investment.id}`] = projectInvestmentAtAge(investment, Number(profile.currentAge), age, scenarioRate, profile.retirementDuration);
     });
-    if (isCashIncludedInProjection(cash)) row.cash = projectCash(cash, years);
+    if (isCashIncludedInProjection(cash) || Number(point.cash) > 0) row.cash = point.cash;
     return row;
   });
 

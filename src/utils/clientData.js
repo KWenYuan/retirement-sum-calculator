@@ -3,9 +3,14 @@ import {
   defaultCpf,
   defaultProfile,
   defaultSrs,
+  SCENARIOS,
   starterInvestments,
   starterPolicies,
 } from '../data/defaults.js';
+import {
+  getInvestmentStructure,
+  projectInvestmentAccumulatedAtAge,
+} from './projections.js';
 
 export const CLIENT_DATA_APP_NAME = 'Retirement Sum Calculator';
 export const CLIENT_DATA_SCHEMA_VERSION = 2;
@@ -41,8 +46,12 @@ export function buildClientDataState({
     cpf,
     srs,
     policies,
-    investments,
-    cash,
+    investments: sanitizeInvestments(
+      investments,
+      profile,
+      SCENARIOS[scenario]?.returnRate || profile.generalReturnRate,
+    ),
+    cash: sanitizeCash(cash),
     scenario,
     selectedAge,
     advisorInsight,
@@ -75,7 +84,7 @@ export function restoreCalculatorState(data = {}) {
     srs: { ...defaultSrs, ...(data.srs || {}) },
     policies: normalizeList(data.policies, starterPolicies),
     investments: normalizeList(data.investments, starterInvestments),
-    cash: { ...defaultCash, ...(data.cash || {}) },
+    cash: sanitizeCash({ ...defaultCash, ...(data.cash || {}) }),
     scenario: data.scenario || 'balanced',
     selectedAge: Number.isFinite(Number(data.selectedAge))
       ? Number(data.selectedAge)
@@ -222,12 +231,17 @@ function buildDataFilename(clientName, exportDate) {
 function normalizeList(value, defaults) {
   if (!Array.isArray(value)) return defaults;
   const fallback = defaults[0] || {};
-  return value.map((item, index) => ({
-    ...fallback,
-    ...item,
-    ...(fallback.premiumCommitmentTerm !== undefined ? normalizePolicyFields(item, fallback) : {}),
-    id: item?.id || `imported-${index + 1}`,
-  }));
+  return value.map((item, index) => {
+    const isPolicy = fallback.premiumCommitmentTerm !== undefined;
+    const normalized = {
+      ...fallback,
+      ...item,
+      ...(isPolicy ? normalizePolicyFields(item, fallback) : normalizeInvestmentFields(item, fallback)),
+      id: item?.id || `imported-${index + 1}`,
+    };
+    if (!isPolicy) delete normalized.riskLevel;
+    return normalized;
+  });
 }
 
 function normalizePolicyFields(item = {}, fallback = {}) {
@@ -247,6 +261,63 @@ function normalizePolicyFields(item = {}, fallback = {}) {
     withdrawalType: item.withdrawalType || fallback.withdrawalType || 'Lump sum',
     showClientExplanation: Boolean(item.showClientExplanation),
   };
+}
+
+function normalizeInvestmentFields(item = {}, fallback = {}) {
+  const withdrawalStartAge = item.withdrawalStartAge ?? item.plannedWithdrawalAge ?? fallback.withdrawalStartAge ?? fallback.plannedWithdrawalAge;
+  const withdrawalType = item.withdrawalType === 'Not shown on timeline'
+    ? 'Keep invested / no withdrawal'
+    : (item.withdrawalType || fallback.withdrawalType || 'Lump sum');
+  return {
+    includeInTotal: item.includeInTotal ?? item.includeInRetirementTotal ?? fallback.includeInTotal ?? true,
+    withdrawalType,
+    withdrawalStartAge,
+    plannedWithdrawalAge: withdrawalStartAge,
+    withdrawalEndAge: item.withdrawalEndAge ?? fallback.withdrawalEndAge,
+    withdrawalDuration: Math.max(1, Number(item.withdrawalDuration) || (Number(item.withdrawalEndAge ?? fallback.withdrawalEndAge) - Number(withdrawalStartAge)) || 1),
+  };
+}
+
+function sanitizeInvestments(investments = [], profile = defaultProfile, scenarioRate = defaultProfile.generalReturnRate) {
+  return investments.map((investment) => {
+    const { riskLevel, ...rest } = investment;
+    const normalized = normalizeInvestmentFields(investment, starterInvestments[0] || {});
+    const exportedInvestment = {
+      ...rest,
+      ...normalized,
+    };
+    const structure = getInvestmentStructure(exportedInvestment, profile.retirementAge, profile.retirementDuration);
+    const projectedValue = projectInvestmentAccumulatedAtAge(
+      exportedInvestment,
+      profile.currentAge,
+      structure.withdrawalStartAge,
+      scenarioRate,
+    );
+    const estimatedMonthlyPayout = structure.withdrawalType === 'Monthly income'
+      ? projectedValue / (structure.withdrawalDuration * 12)
+      : 0;
+    const estimatedYearlyPayout = structure.withdrawalType === 'Yearly income'
+      ? projectedValue / structure.withdrawalDuration
+      : 0;
+
+    return {
+      ...exportedInvestment,
+      includeInRetirementTotal: exportedInvestment.includeInTotal,
+      withdrawalDuration: structure.withdrawalDuration,
+      estimatedMonthlyPayout,
+      estimatedYearlyPayout,
+    };
+  });
+}
+
+function sanitizeCash(cash = {}) {
+  const {
+    plannedWithdrawalAge,
+    withdrawalType,
+    withdrawalEndAge,
+    ...rest
+  } = cash;
+  return rest;
 }
 
 function normalizeTasks(value) {

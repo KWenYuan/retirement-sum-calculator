@@ -1,12 +1,13 @@
 import {
   calculateCpfAge55Transfer,
   formatCurrency,
+  getInvestmentStructure,
   getPolicyStructure,
   hasCpfFrsMilestoneData,
   hasCpfProjectionData,
   projectCash,
-  projectInvestment,
-  projectPolicy,
+  projectInvestmentAccumulatedAtAge,
+  projectPolicyAccumulatedAtAge,
   projectSrs,
   isCashIncludedInProjection,
 } from '../utils/projections.js';
@@ -55,22 +56,22 @@ export function ExportReport({
   const cpf55 = includeCpf55 ? calculateCpfAge55Transfer(cpf, profile) : null;
   const srsSummary = buildSrsSummary(profile, srs);
   const personalInvestmentRows = investments.map((investment) => {
-    const withdrawalAge = asNumber(investment.plannedWithdrawalAge) || asNumber(profile.retirementAge);
-    const value = projectInvestment(
+    const structure = getInvestmentStructure(investment, asNumber(profile.retirementAge), asNumber(profile.retirementDuration));
+    const value = projectInvestmentAccumulatedAtAge(
       investment,
-      Math.max(0, withdrawalAge - asNumber(profile.currentAge)),
+      asNumber(profile.currentAge),
+      structure.withdrawalStartAge,
       scenarioRate,
     );
     return [
       investment.name || 'Investment',
-      investment.riskLevel,
-      investment.withdrawalType || 'Lump sum',
-      withdrawalAge,
+      investment.includeInTotal ? 'Included' : 'Excluded',
+      buildInvestmentWithdrawalLabel(structure, value),
+      structure.withdrawalStartAge,
       formatCurrency(value),
     ];
   });
-  const cashWithdrawalAge = asNumber(cash.plannedWithdrawalAge) || asNumber(profile.retirementAge);
-  const cashProjectedValue = projectCash(cash, Math.max(0, cashWithdrawalAge - asNumber(profile.currentAge)));
+  const cashProjectedValue = projectCash(cash, Math.max(0, asNumber(profile.retirementAge) - asNumber(profile.currentAge)));
 
   return (
     <article className="export-report">
@@ -209,7 +210,7 @@ export function ExportReport({
           headers={['Policy', 'Premium commitment', 'Premium period', 'Holding until', 'Withdrawal strategy', 'Projected value']}
           rows={policies.map((policy) => {
             const structure = getPolicyStructure(policy, asNumber(profile.retirementAge));
-            const projectedValue = projectPolicy(policy, asNumber(profile.currentAge), structure.withdrawalStartAge || structure.holdingUntilAge, scenarioRate);
+            const projectedValue = projectPolicyAccumulatedAtAge(policy, asNumber(profile.currentAge), structure.withdrawalStartAge || structure.holdingUntilAge, scenarioRate);
             return [
               policy.name || 'Policy',
               policy.continuePremiumsAfterCommitment
@@ -227,7 +228,7 @@ export function ExportReport({
       <section className="export-section avoid-break">
         <h2>Personal Investment Summary</h2>
         <SimpleTable
-          headers={['Investment', 'Risk level', 'Timeline treatment', 'Start age', 'Projected value']}
+          headers={['Investment', 'Projection', 'Withdrawal strategy', 'Start age', 'Projected value']}
           rows={personalInvestmentRows}
           emptyMessage="No personal investments entered."
         />
@@ -239,8 +240,7 @@ export function ExportReport({
           <SimpleTable
             headers={['Item', 'Estimate']}
             rows={[
-              ['Available age', cashWithdrawalAge],
-              ['Projected accessible cash / savings', formatCurrency(cashProjectedValue)],
+              ['Projected accessible cash / savings at retirement age', formatCurrency(cashProjectedValue)],
               ['Emergency fund included', cash.includeEmergencyFund ? 'Yes' : 'No'],
             ]}
           />
@@ -439,6 +439,17 @@ function buildPolicyWithdrawalLabel(structure) {
   if (structure.withdrawalType === 'Keep invested / no withdrawal yet') return 'Keep invested / no withdrawal yet';
   if (structure.withdrawalType === 'Monthly income' || structure.withdrawalType === 'Yearly income') {
     return `${structure.withdrawalType}, age ${structure.withdrawalStartAge}-${structure.withdrawalEndAge}`;
+  }
+  return `Lump sum at age ${structure.withdrawalStartAge}`;
+}
+
+function buildInvestmentWithdrawalLabel(structure, projectedValue) {
+  if (structure.withdrawalType === 'Keep invested / no withdrawal') return 'Keep invested / no withdrawal';
+  if (structure.withdrawalType === 'Monthly income') {
+    return `${formatCurrency(projectedValue / (structure.withdrawalDuration * 12))}/month, age ${structure.withdrawalStartAge}-${structure.withdrawalEndAge}`;
+  }
+  if (structure.withdrawalType === 'Yearly income') {
+    return `${formatCurrency(projectedValue / structure.withdrawalDuration)}/year, age ${structure.withdrawalStartAge}-${structure.withdrawalEndAge}`;
   }
   return `Lump sum at age ${structure.withdrawalStartAge}`;
 }

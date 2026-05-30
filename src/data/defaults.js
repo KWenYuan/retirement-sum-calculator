@@ -58,9 +58,6 @@ export const defaultCash = {
   annualInterest: 1.5,
   emergencyFund: 45000,
   includeEmergencyFund: false,
-  plannedWithdrawalAge: 65,
-  withdrawalType: 'Lump sum',
-  withdrawalEndAge: 75,
 };
 
 export const starterPolicies = [
@@ -96,9 +93,9 @@ export const starterInvestments = [
     currentValue: 150000,
     monthlyContribution: 1800,
     annualReturn: 5,
-    useScenarioReturn: true,
-    riskLevel: 'Balanced',
+    useScenarioReturn: false,
     includeInTotal: true,
+    withdrawalStartAge: 65,
     plannedWithdrawalAge: 65,
     withdrawalType: 'Lump sum',
     withdrawalEndAge: 75,

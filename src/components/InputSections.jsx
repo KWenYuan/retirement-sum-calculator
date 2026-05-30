@@ -6,9 +6,10 @@ import {
   formatCurrency,
   getCpfRetirementSums,
   getSelectedCpfRetirementSum,
+  getInvestmentStructure,
   getPolicyStructure,
-  projectInvestment,
-  projectPolicy,
+  projectInvestmentAccumulatedAtAge,
+  projectPolicyAccumulatedAtAge,
 } from '../utils/projections.js';
 
 const POLICY_STRUCTURES = [
@@ -121,14 +122,9 @@ export function CashSection({ cash, setCash }) {
         <NumberField label="Emergency fund" prefix="$" value={cash.emergencyFund} onChange={(value) => update('emergencyFund', value)} />
       </div>
       <details className="advanced-block">
-        <summary>Withdrawal settings</summary>
+        <summary>Cash assumptions</summary>
         <div className="form-grid compact input-compact-grid">
           <NumberField label="Expected annual interest" suffix="%" step={0.1} value={cash.annualInterest} onChange={(value) => update('annualInterest', value)} />
-          <SelectField label="Timeline withdrawal type" value={cash.withdrawalType || 'Lump sum'} onChange={(value) => update('withdrawalType', value)} options={['Not shown on timeline', 'Lump sum', 'Monthly income', 'Yearly income']} />
-          <NumberField label="Planned withdrawal age" value={cash.plannedWithdrawalAge} onChange={(value) => update('plannedWithdrawalAge', value)} />
-          {(cash.withdrawalType === 'Monthly income' || cash.withdrawalType === 'Yearly income') && (
-            <NumberField label="Withdrawal end age" value={cash.withdrawalEndAge} onChange={(value) => update('withdrawalEndAge', value)} />
-          )}
           <Toggle label="Include emergency fund" checked={cash.includeEmergencyFund} onChange={(value) => update('includeEmergencyFund', value)} />
         </div>
       </details>
@@ -215,9 +211,9 @@ export function InvestmentsSection({ investments, setInvestments, profile, scena
         currentValue: 0,
         monthlyContribution: 1000,
         annualReturn: 5,
-        useScenarioReturn: true,
-        riskLevel: 'Balanced',
+        useScenarioReturn: false,
         includeInTotal: true,
+        withdrawalStartAge: profile.retirementAge,
         plannedWithdrawalAge: profile.retirementAge,
         withdrawalType: 'Lump sum',
         withdrawalEndAge: profile.retirementAge + 10,
@@ -261,7 +257,7 @@ export function InvestmentsSection({ investments, setInvestments, profile, scena
 
 function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePolicy, removePolicy, profile, scenarioRate }) {
   const structure = getPolicyStructure(policy, Number(profile.retirementAge));
-  const projectedValue = projectPolicy(policy, Number(profile.currentAge), structure.withdrawalStartAge || structure.holdingUntilAge, scenarioRate);
+  const projectedValue = projectPolicyAccumulatedAtAge(policy, Number(profile.currentAge), structure.withdrawalStartAge || structure.holdingUntilAge, scenarioRate);
   const payout = getPolicyPayoutSummary(policy, projectedValue, structure);
   const explanation = getPolicyExplanation(policy, projectedValue, structure);
   const premiumSummary = getPolicyPremiumSummary(policy, structure);
@@ -356,22 +352,29 @@ function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePo
 }
 
 function InvestmentCard({ investment, isEditing, setEditingId, updateInvestment, duplicateInvestment, removeInvestment, profile, scenarioRate }) {
-  const withdrawalAge = Number(investment.plannedWithdrawalAge) || Number(profile.retirementAge);
-  const yearsToWithdrawal = Math.max(0, withdrawalAge - Number(profile.currentAge));
-  const projectedValue = projectInvestment(investment, yearsToWithdrawal, scenarioRate);
+  const structure = getInvestmentStructure(investment, Number(profile.retirementAge), Number(profile.retirementDuration));
+  const projectedValue = projectInvestmentAccumulatedAtAge(investment, Number(profile.currentAge), structure.withdrawalStartAge, scenarioRate);
+  const payout = getInvestmentPayoutSummary(projectedValue, structure);
   return (
     <div className="compact-item-card">
       <div className="compact-item-summary">
         <div>
           <strong>{investment.name || 'Investment'}</strong>
           <span>Contribution: {formatCurrency(investment.monthlyContribution)}/month</span>
-          <span>{investment.riskLevel} | {investment.withdrawalType || 'Lump sum'} at age {withdrawalAge}</span>
+          <span>Withdrawal: {payout.label}</span>
+          {!investment.includeInTotal && <span>Excluded from retirement total</span>}
         </div>
         <div className="compact-item-value">
-          <span>Projected</span>
+          <span>Projected at age {structure.withdrawalStartAge}</span>
           <strong>{formatCurrency(projectedValue)}</strong>
         </div>
       </div>
+      {payout.amount && (
+        <div className="policy-derived-panel investment-derived-panel">
+          <span>Estimated payout: <strong>{payout.amount}</strong></span>
+          <span>Duration: <strong>{payout.duration}</strong></span>
+        </div>
+      )}
       <div className="compact-item-actions">
         <button type="button" className="ghost-button compact-action" onClick={() => setEditingId(isEditing ? null : investment.id)}><Pencil size={14} /> {isEditing ? 'Close' : 'Edit'}</button>
         <button type="button" className="ghost-button compact-action" onClick={() => duplicateInvestment(investment)}><Copy size={14} /> Duplicate</button>
@@ -384,16 +387,18 @@ function InvestmentCard({ investment, isEditing, setEditingId, updateInvestment,
             <NumberField label="Current value" prefix="$" value={investment.currentValue} onChange={(value) => updateInvestment(investment.id, 'currentValue', value)} />
             <NumberField label="Monthly contribution" prefix="$" value={investment.monthlyContribution} onChange={(value) => updateInvestment(investment.id, 'monthlyContribution', value)} />
             <NumberField label="Expected return" suffix="%" step={0.1} value={investment.annualReturn} onChange={(value) => updateInvestment(investment.id, 'annualReturn', value)} />
-            <SelectField label="Risk level" value={investment.riskLevel} onChange={(value) => updateInvestment(investment.id, 'riskLevel', value)} options={['Conservative', 'Balanced', 'Growth']} />
             <Toggle label="Include in retirement total" checked={investment.includeInTotal} onChange={(value) => updateInvestment(investment.id, 'includeInTotal', value)} />
           </div>
           <details className="advanced-block">
             <summary>Withdrawal settings</summary>
             <div className="form-grid compact input-compact-grid">
-              <SelectField label="Timeline withdrawal type" value={investment.withdrawalType || 'Lump sum'} onChange={(value) => updateInvestment(investment.id, 'withdrawalType', value)} options={['Not shown on timeline', 'Lump sum', 'Monthly income', 'Yearly income']} />
-              <NumberField label="Planned withdrawal age" value={investment.plannedWithdrawalAge} onChange={(value) => updateInvestment(investment.id, 'plannedWithdrawalAge', value)} />
-              {investment.withdrawalType !== 'Lump sum' && investment.withdrawalType !== 'Not shown on timeline' && (
-                <NumberField label="Withdrawal end age" value={investment.withdrawalEndAge} onChange={(value) => updateInvestment(investment.id, 'withdrawalEndAge', value)} />
+              <SelectField label="Withdrawal type" value={structure.withdrawalType} onChange={(value) => updateInvestment(investment.id, 'withdrawalType', value)} options={['Lump sum', 'Monthly income', 'Yearly income', 'Keep invested / no withdrawal']} />
+              <NumberField label="Withdrawal start age" value={investment.withdrawalStartAge ?? investment.plannedWithdrawalAge ?? ''} onChange={(value) => {
+                updateInvestment(investment.id, 'withdrawalStartAge', value);
+                updateInvestment(investment.id, 'plannedWithdrawalAge', value);
+              }} />
+              {(structure.withdrawalType === 'Monthly income' || structure.withdrawalType === 'Yearly income') && (
+                <NumberField label="Withdrawal end age" value={investment.withdrawalEndAge ?? ''} onChange={(value) => updateInvestment(investment.id, 'withdrawalEndAge', value)} />
               )}
             </div>
           </details>
@@ -401,6 +406,37 @@ function InvestmentCard({ investment, isEditing, setEditingId, updateInvestment,
       )}
     </div>
   );
+}
+
+function getInvestmentPayoutSummary(projectedValue, structure) {
+  if (structure.withdrawalType === 'Keep invested / no withdrawal') {
+    return {
+      label: `Keep invested from age ${structure.withdrawalStartAge}`,
+      amount: '',
+      duration: 'No payout selected',
+    };
+  }
+  if (structure.withdrawalType === 'Monthly income') {
+    const monthly = projectedValue / (structure.withdrawalDuration * 12);
+    return {
+      label: `${formatCurrency(monthly)}/month from age ${structure.withdrawalStartAge}-${structure.withdrawalEndAge}`,
+      amount: `${formatCurrency(monthly)}/month`,
+      duration: `${structure.withdrawalDuration} years`,
+    };
+  }
+  if (structure.withdrawalType === 'Yearly income') {
+    const yearly = projectedValue / structure.withdrawalDuration;
+    return {
+      label: `${formatCurrency(yearly)}/year from age ${structure.withdrawalStartAge}-${structure.withdrawalEndAge}`,
+      amount: `${formatCurrency(yearly)}/year`,
+      duration: `${structure.withdrawalDuration} years`,
+    };
+  }
+  return {
+    label: `Lump sum at age ${structure.withdrawalStartAge}`,
+    amount: formatCurrency(projectedValue),
+    duration: 'One-time',
+  };
 }
 
 function AccordionSection({ title, action, children, defaultOpen = false }) {
