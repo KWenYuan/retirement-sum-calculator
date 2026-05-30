@@ -274,6 +274,12 @@ export default function App() {
       <div className="report-surface">
         <Dashboard
           profile={profile}
+          cpf={cpf}
+          srs={srs}
+          policies={policies}
+          investments={investments}
+          cash={cash}
+          scenarioRate={scenarioRate}
           timeline={timeline}
           selectedBreakdown={selectedBreakdown}
           selectedAge={clampedSelectedAge}

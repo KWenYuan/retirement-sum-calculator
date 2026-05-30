@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -13,12 +14,34 @@ import {
   YAxis,
 } from 'recharts';
 import { Database, Download, FileText, FolderUp, Trash2, TrendingUp } from 'lucide-react';
-import { formatCurrency } from '../utils/projections.js';
+import {
+  formatCurrency,
+  isCashIncludedInProjection,
+  projectCash,
+  projectCpf,
+  projectInvestment,
+  projectPolicy,
+  projectSrs,
+} from '../utils/projections.js';
 
 const COLORS = ['#15345f', '#c49a43', '#4d7ea8', '#78a083', '#d9a441'];
+const SERIES_COLORS = {
+  total: '#102a4c',
+  cpf: '#4d7ea8',
+  srs: '#2f855a',
+  cash: '#7b8492',
+  policy: ['#c49a43', '#d9a441', '#b7791f', '#f0b84a'],
+  investment: ['#7b61a8', '#8f72c7', '#5f4b8b', '#a88bd8'],
+};
 
 export function Dashboard({
   profile,
+  cpf,
+  srs,
+  policies,
+  investments,
+  cash,
+  scenarioRate,
   timeline,
   selectedBreakdown,
   selectedAge,
@@ -37,7 +60,18 @@ export function Dashboard({
   dataMessage,
   dataError,
 }) {
+  const [chartView, setChartView] = useState('total-components');
+  const [highlightedSeries, setHighlightedSeries] = useState(null);
   const timelineEndAge = timeline[timeline.length - 1]?.age || profile.retirementAge;
+  const { chartData, series } = useMemo(
+    () => buildProjectionSeries({ profile, cpf, srs, policies, investments, cash, scenarioRate, timeline }),
+    [profile, cpf, srs, policies, investments, cash, scenarioRate, timeline],
+  );
+  const visibleSeries = series.filter((item) => {
+    if (chartView === 'total') return item.key === 'total';
+    if (chartView === 'components') return item.key !== 'total';
+    return true;
+  });
   const breakdownData = [
     { name: 'CPF', value: selectedBreakdown.cpf },
     { name: 'SRS', value: selectedBreakdown.srs },
@@ -102,19 +136,73 @@ export function Dashboard({
 
       <section className="panel chart-panel">
         <div className="section-header">
-          <h2>Projected Assets by Age</h2>
-          <span className="micro-copy">Click or drag the timeline below to inspect an age</span>
+          <div>
+            <h2>Projected Assets by Age</h2>
+            <span className="micro-copy">Click a legend item to highlight one projection line</span>
+          </div>
+          <div className="chart-mode-toggle" aria-label="Chart View">
+            <span>Chart View</span>
+            {[
+              ['total', 'Total only'],
+              ['components', 'Individual components'],
+              ['total-components', 'Total + Individual'],
+            ].map(([key, label]) => (
+              <button
+                type="button"
+                key={key}
+                className={chartView === key ? 'active' : ''}
+                onClick={() => setChartView(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="chart-height large">
-          <ResponsiveContainer>
-            <LineChart data={timeline} margin={{ top: 10, right: 18, bottom: 0, left: 8 }}>
-              <CartesianGrid stroke="#e6ebf2" vertical={false} />
-              <XAxis dataKey="age" tickLine={false} axisLine={false} />
-              <YAxis tickFormatter={(value) => formatCurrency(value, true)} tickLine={false} axisLine={false} width={74} />
-              <Tooltip formatter={(value) => formatCurrency(value)} labelFormatter={(label) => `Age ${label}`} />
-              <Line type="monotone" dataKey="total" stroke="#15345f" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#c49a43' }} />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="projection-chart-layout">
+          <div className="chart-height large">
+            <ResponsiveContainer>
+              <LineChart data={chartData} margin={{ top: 10, right: 18, bottom: 0, left: 8 }}>
+                <CartesianGrid stroke="#e6ebf2" vertical={false} />
+                <XAxis dataKey="age" tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={(value) => formatCurrency(value, true)} tickLine={false} axisLine={false} width={74} />
+                <Tooltip content={<ProjectionTooltip series={series} />} />
+                {visibleSeries.map((item) => {
+                  const isHighlighted = !highlightedSeries || highlightedSeries === item.key;
+                  return (
+                    <Line
+                      key={item.key}
+                      type="monotone"
+                      dataKey={item.key}
+                      name={item.name}
+                      stroke={highlightedSeries && !isHighlighted ? '#aeb9c8' : item.color}
+                      strokeWidth={highlightedSeries === item.key ? 4 : item.key === 'total' ? 3 : 2}
+                      strokeOpacity={isHighlighted ? 1 : 0.24}
+                      dot={false}
+                      activeDot={isHighlighted ? { r: 5, fill: item.color } : false}
+                      connectNulls
+                    />
+                  );
+                })}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="projection-legend">
+            {series.map((item) => {
+              const isVisible = visibleSeries.some((visible) => visible.key === item.key);
+              const isHighlighted = highlightedSeries === item.key;
+              return (
+                <button
+                  type="button"
+                  key={item.key}
+                  className={`${isHighlighted ? 'active' : ''} ${!isVisible ? 'muted' : ''}`}
+                  onClick={() => setHighlightedSeries(isHighlighted ? null : item.key)}
+                >
+                  <span style={{ background: item.color }} />
+                  {item.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <input
           className="age-slider"
@@ -224,4 +312,63 @@ function MetricCard({ label, value, tone }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function ProjectionTooltip({ active, label, payload, series }) {
+  if (!active || !payload?.length) return null;
+  const values = new Map(payload.map((item) => [item.dataKey, item.value]));
+  return (
+    <div className="projection-tooltip">
+      <strong>Age {label}</strong>
+      {series.map((item) => (
+        values.has(item.key) && (
+          <div key={item.key}>
+            <span><i style={{ background: item.color }} /> {item.name}</span>
+            <b>{formatCurrency(values.get(item.key))}</b>
+          </div>
+        )
+      ))}
+    </div>
+  );
+}
+
+function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash, scenarioRate, timeline }) {
+  const series = [{ key: 'total', name: 'Total', color: SERIES_COLORS.total }];
+  if (cpf.enabled) series.push({ key: 'cpf', name: 'CPF', color: SERIES_COLORS.cpf });
+  if (srs.enabled) series.push({ key: 'srs', name: 'SRS', color: SERIES_COLORS.srs });
+  policies.forEach((policy, index) => {
+    series.push({
+      key: `policy_${policy.id}`,
+      name: policy.name || `Policy ${index + 1}`,
+      color: SERIES_COLORS.policy[index % SERIES_COLORS.policy.length],
+    });
+  });
+  investments.forEach((investment, index) => {
+    if (!investment.includeInTotal) return;
+    series.push({
+      key: `investment_${investment.id}`,
+      name: investment.name || `Investment ${index + 1}`,
+      color: SERIES_COLORS.investment[index % SERIES_COLORS.investment.length],
+    });
+  });
+  if (isCashIncludedInProjection(cash)) series.push({ key: 'cash', name: 'Cash / Savings', color: SERIES_COLORS.cash });
+
+  const chartData = timeline.map((point) => {
+    const age = Number(point.age);
+    const years = Math.max(0, age - Number(profile.currentAge));
+    const row = { age, total: point.total };
+    if (cpf.enabled) row.cpf = projectCpf(cpf, years);
+    if (srs.enabled) row.srs = projectSrs(srs, Number(profile.currentAge), age);
+    policies.forEach((policy) => {
+      row[`policy_${policy.id}`] = projectPolicy(policy, Number(profile.currentAge), age, scenarioRate);
+    });
+    investments.forEach((investment) => {
+      if (!investment.includeInTotal) return;
+      row[`investment_${investment.id}`] = projectInvestment(investment, years, scenarioRate);
+    });
+    if (isCashIncludedInProjection(cash)) row.cash = projectCash(cash, years);
+    return row;
+  });
+
+  return { chartData, series };
 }
