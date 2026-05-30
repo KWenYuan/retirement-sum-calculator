@@ -49,10 +49,93 @@ button {
   cursor: pointer;
 }
 
+.app-shell {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.mode-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 72px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px rgba(16, 42, 76, 0.06);
+}
+
+.mode-toolbar-title {
+  display: grid;
+  gap: 2px;
+  min-width: 220px;
+  color: var(--navy);
+}
+
+.mode-toolbar-title strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.mode-toolbar-title span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mode-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.mode-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.mode-toggle button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.mode-toggle button.active {
+  background: var(--navy);
+  color: white;
+  box-shadow: 0 6px 14px rgba(16, 42, 76, 0.16);
+}
+
+.mode-action,
+.mode-export {
+  min-height: 42px;
+}
+
 .app {
   display: grid;
   grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
-  min-height: 100vh;
+  min-height: calc(100vh - 72px);
+}
+
+.app.presentation-app {
+  display: block;
+  min-height: calc(100vh - 72px);
 }
 
 .sidebar {
@@ -60,7 +143,7 @@ button {
   border-right: 1px solid var(--line);
   padding: 20px;
   overflow-y: auto;
-  max-height: 100vh;
+  max-height: calc(100vh - 72px);
 }
 
 .brand {
@@ -553,8 +636,17 @@ textarea:focus {
   min-width: 0;
 }
 
+.presentation-app .report-surface {
+  width: min(100%, 1500px);
+  margin: 0 auto;
+}
+
 .dashboard {
   padding: 26px;
+}
+
+.presentation-app .dashboard {
+  padding: 30px clamp(22px, 4vw, 52px);
 }
 
 .hero-panel {
@@ -587,6 +679,38 @@ textarea:focus {
   max-width: 760px;
   margin: 10px 0 0;
   color: #dbe6f2;
+}
+
+.presentation-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+  max-width: 1040px;
+}
+
+.presentation-hero-stats div {
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.presentation-hero-stats span {
+  display: block;
+  color: #dbe6f2;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.presentation-hero-stats strong {
+  display: block;
+  margin-top: 6px;
+  color: white;
+  font-size: clamp(18px, 2.2vw, 26px);
+  line-height: 1.05;
 }
 
 .export-button {
@@ -1039,8 +1163,32 @@ textarea:focus {
   color: var(--danger);
 }
 
+.presentation-metric-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.presentation-metric-grid .metric-card {
+  min-height: 132px;
+  padding: 22px;
+}
+
+.presentation-metric-grid .metric-card strong {
+  font-size: clamp(25px, 3vw, 38px);
+}
+
 .chart-panel {
   margin-bottom: 18px;
+}
+
+.presentation-app .chart-panel,
+.presentation-app .retirement-timeline-panel,
+.presentation-app .income-sources-panel,
+.presentation-app .key-takeaways-panel {
+  box-shadow: 0 16px 44px rgba(16, 42, 76, 0.07);
+}
+
+.presentation-app .chart-height.large {
+  height: 410px;
 }
 
 .chart-mode-toggle {
@@ -1270,6 +1418,32 @@ textarea:focus {
 
 .timeline-placement {
   padding-top: 0;
+}
+
+.presentation-app .timeline-placement {
+  padding-top: 0;
+}
+
+.key-takeaways-panel {
+  margin-top: 16px;
+}
+
+.key-takeaway-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.key-takeaway-list li {
+  color: #344054;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.key-takeaway-list li::marker {
+  color: var(--gold);
+  font-weight: 900;
 }
 
 .retirement-timeline-panel {
@@ -2372,9 +2546,34 @@ textarea:focus {
   .data-export-actions {
     justify-content: flex-start;
   }
+
+  .presentation-hero-stats,
+  .presentation-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
+  .mode-toolbar {
+    position: relative;
+    align-items: stretch;
+    display: grid;
+    padding: 12px 16px;
+  }
+
+  .mode-toolbar-title {
+    min-width: 0;
+  }
+
+  .mode-toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .mode-toggle,
+  .mode-toggle button {
+    width: 100%;
+  }
+
   .sidebar,
   .dashboard {
     padding: 16px;
@@ -2397,10 +2596,20 @@ textarea:focus {
   .review-grid,
   .change-groups,
   .summary-grid,
-  .age-detail-grid,
-  .form-grid,
-  .form-grid.compact {
+    .age-detail-grid,
+    .presentation-hero-stats,
+    .presentation-metric-grid,
+    .form-grid,
+    .form-grid.compact {
     grid-template-columns: 1fr;
+  }
+
+  .presentation-app .dashboard {
+    padding: 16px;
+  }
+
+  .presentation-app .chart-height.large {
+    height: 300px;
   }
 
   .task-card {

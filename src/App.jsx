@@ -44,6 +44,7 @@ import {
   buildIncomeSources,
   buildRetirementTimeline,
   buildTimeline,
+  calculatePayoutSummary,
   calculateAtAge,
   calculateNeeds,
   formatCurrency,
@@ -53,9 +54,12 @@ import {
 } from './utils/projections.js';
 
 const disclaimer = 'This calculator is for illustration and discussion purposes only. Figures are based on assumptions entered and are not guaranteed. Actual returns, CPF rules, SRS treatment, policy values, fees, withdrawals, taxation and market conditions may differ. Please refer to official policy documents and CPF/SRS guidelines where applicable.';
+const VIEW_MODE_STORAGE_KEY = 'retirementProjectionViewMode';
 
 export default function App() {
   const savedState = useMemo(() => loadClientDataFromStorage(), []);
+  const [viewMode, setViewMode] = useState(() => loadViewMode());
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [profile, setProfile] = useState(savedState?.profile || defaultProfile);
   const [cpf, setCpf] = useState(savedState?.cpf || defaultCpf);
   const [srs, setSrs] = useState(savedState?.srs || defaultSrs);
@@ -96,6 +100,7 @@ export default function App() {
     () => getAgeTimelineDetails(retirementTimeline, clampedSelectedAge),
     [retirementTimeline, clampedSelectedAge],
   );
+  const payoutSummary = useMemo(() => calculatePayoutSummary(ageDetails), [ageDetails]);
   const incomeSources = useMemo(
     () => buildIncomeSources({ profile, age: clampedSelectedAge, ageDetails }),
     [profile, clampedSelectedAge, ageDetails],
@@ -132,6 +137,16 @@ export default function App() {
   useEffect(() => {
     saveClientDataToStorage(clientDataState);
   }, [clientDataState]);
+
+  useEffect(() => {
+    saveViewMode(viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   const exportPdf = async () => {
     if (!exportReportRef.current || isExporting) return;
@@ -231,6 +246,18 @@ export default function App() {
     setDataError('');
   };
 
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen?.();
+      } else {
+        await document.exitFullscreen?.();
+      }
+    } catch (error) {
+      console.warn('Fullscreen toggle failed:', error);
+    }
+  };
+
   const restoreState = (state) => {
     setProfile(state.profile);
     setCpf(state.cpf);
@@ -247,32 +274,45 @@ export default function App() {
   };
 
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <div>
-            <strong>Retirement Projection Studio</strong>
-            <span>Private advisor calculator</span>
-          </div>
-        </div>
+    <div className={`app-shell ${viewMode}-mode`}>
+      <ModeToolbar
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        exportPdf={exportPdf}
+        isExporting={isExporting}
+        toggleFullscreen={toggleFullscreen}
+        isFullscreen={isFullscreen}
+      />
 
-        <SidebarInputSummary
-          profile={profile}
-          retirementPoint={retirementPoint}
-          incomeSources={incomeSources}
-          needs={needs}
-        />
+      <div className={`app ${viewMode === 'presentation' ? 'presentation-app' : ''}`}>
+        {viewMode === 'advisor' && (
+          <aside className="sidebar">
+            <div className="brand">
+              <div>
+                <strong>Retirement Projection Studio</strong>
+                <span>Private advisor calculator</span>
+              </div>
+            </div>
 
-        <ProfileSection profile={profile} setProfile={setProfile} />
-        <CpfSection cpf={cpf} setCpf={setCpf} />
-        <SrsSection srs={srs} setSrs={setSrs} />
-        <CashSection cash={cash} setCash={setCash} />
-        <PoliciesSection policies={policies} setPolicies={setPolicies} profile={profile} scenarioRate={scenarioRate} />
-        <InvestmentsSection investments={investments} setInvestments={setInvestments} profile={profile} scenarioRate={scenarioRate} />
-      </aside>
+            <SidebarInputSummary
+              profile={profile}
+              retirementPoint={retirementPoint}
+              incomeSources={incomeSources}
+              needs={needs}
+            />
 
-      <div className="report-surface">
+            <ProfileSection profile={profile} setProfile={setProfile} />
+            <CpfSection cpf={cpf} setCpf={setCpf} />
+            <SrsSection srs={srs} setSrs={setSrs} />
+            <CashSection cash={cash} setCash={setCash} />
+            <PoliciesSection policies={policies} setPolicies={setPolicies} profile={profile} scenarioRate={scenarioRate} />
+            <InvestmentsSection investments={investments} setInvestments={setInvestments} profile={profile} scenarioRate={scenarioRate} />
+          </aside>
+        )}
+
+        <div className="report-surface">
         <Dashboard
+          viewMode={viewMode}
           profile={profile}
           cpf={cpf}
           srs={srs}
@@ -286,6 +326,8 @@ export default function App() {
           setSelectedAge={setSelectedAge}
           retirementPoint={retirementPoint}
           needs={needs}
+          payoutSummary={payoutSummary}
+          incomeSources={incomeSources}
           startLater={startLater}
           advisorInsight={advisorInsight}
           setAdvisorInsight={setAdvisorInsight}
@@ -309,23 +351,36 @@ export default function App() {
 
           <RetirementIncomeSources incomeSources={incomeSources} />
 
-          <AnnualReview
-            previousReviewData={previousReviewData}
-            comparison={annualReviewComparison}
-            changes={reviewChanges}
-            importPreviousReviewData={requestImportPreviousReviewData}
-            clearPreviousReviewData={clearPreviousReviewData}
-          />
+          {viewMode === 'advisor' ? (
+            <>
+              <AnnualReview
+                previousReviewData={previousReviewData}
+                comparison={annualReviewComparison}
+                changes={reviewChanges}
+                importPreviousReviewData={requestImportPreviousReviewData}
+                clearPreviousReviewData={clearPreviousReviewData}
+              />
 
-          <FollowUpTasks
-            tasks={followUpTasks}
-            setTasks={setFollowUpTasks}
-            includeFollowUpTasksInPdf={includeFollowUpTasksInPdf}
-            setIncludeFollowUpTasksInPdf={setIncludeFollowUpTasksInPdf}
-          />
+              <FollowUpTasks
+                tasks={followUpTasks}
+                setTasks={setFollowUpTasks}
+                includeFollowUpTasksInPdf={includeFollowUpTasksInPdf}
+                setIncludeFollowUpTasksInPdf={setIncludeFollowUpTasksInPdf}
+              />
+            </>
+          ) : (
+            <KeyTakeaways
+              profile={profile}
+              retirementPoint={retirementPoint}
+              incomeSources={incomeSources}
+              needs={needs}
+              cpf={cpf}
+            />
+          )}
         </div>
 
-        <section className="pdf-summary">
+        {viewMode === 'advisor' && (
+          <section className="pdf-summary">
           <h2>Client Summary</h2>
           <div className="summary-grid">
             <SummaryItem label="Client name" value={profile.clientName} />
@@ -337,12 +392,14 @@ export default function App() {
             <SummaryItem label="Surplus / shortfall" value={formatCurrency(needs.surplusShortfall)} />
             <SummaryItem label="Advisor insight" value={advisorInsight} />
           </div>
-        </section>
+          </section>
+        )}
 
         <footer className="disclaimer">
           <ShieldCheck size={18} />
           <p>{disclaimer}</p>
         </footer>
+        </div>
       </div>
 
       <div className="export-report-host" aria-hidden="true">
@@ -388,6 +445,68 @@ export default function App() {
   );
 }
 
+function loadViewMode() {
+  try {
+    const stored = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    return stored === 'presentation' ? 'presentation' : 'advisor';
+  } catch {
+    return 'advisor';
+  }
+}
+
+function saveViewMode(viewMode) {
+  try {
+    window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+  } catch {
+    // Local storage can be unavailable in private contexts; mode still works in state.
+  }
+}
+
+function ModeToolbar({ viewMode, setViewMode, exportPdf, isExporting, toggleFullscreen, isFullscreen }) {
+  const isPresentation = viewMode === 'presentation';
+  return (
+    <header className="mode-toolbar">
+      <div className="mode-toolbar-title">
+        <strong>Retirement Projection Studio</strong>
+        <span>{isPresentation ? 'Client presentation dashboard' : 'Advisor workspace'}</span>
+      </div>
+      <div className="mode-toolbar-actions">
+        <div className="mode-toggle" aria-label="View mode">
+          <button
+            type="button"
+            className={viewMode === 'advisor' ? 'active' : ''}
+            onClick={() => setViewMode('advisor')}
+          >
+            Advisor Mode
+          </button>
+          <button
+            type="button"
+            className={isPresentation ? 'active' : ''}
+            onClick={() => setViewMode('presentation')}
+          >
+            Presentation Mode
+          </button>
+        </div>
+        {isPresentation && (
+          <>
+            <button className="ghost-button mode-action" type="button" onClick={() => setViewMode('advisor')}>
+              Edit Details
+            </button>
+            <button className="export-button mode-export" type="button" onClick={exportPdf} disabled={isExporting}>
+              {isExporting ? 'Generating PDF...' : 'Export PDF'}
+            </button>
+            {document.fullscreenEnabled && (
+              <button className="ghost-button mode-action" type="button" onClick={toggleFullscreen}>
+                {isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </header>
+  );
+}
+
 function buildReportFilename(clientName, exportDate) {
   const cleanName = clientName
     .trim()
@@ -430,5 +549,36 @@ function SummaryMini({ label, value }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function KeyTakeaways({ profile, retirementPoint, incomeSources, needs, cpf }) {
+  const gapLabel = needs.surplusShortfall >= 0 ? 'estimated surplus' : 'estimated shortfall';
+  const planningOpportunity = needs.surplusShortfall >= 0
+    ? 'The plan is currently ahead of the illustrated retirement need based on the assumptions shown.'
+    : 'The main planning opportunity is to close the retirement income gap with additional savings, investments, or adjusted assumptions.';
+
+  const takeaways = [
+    `Your projected retirement assets are ${formatCurrency(retirementPoint.total)} by age ${profile.retirementAge}.`,
+    `Your projected monthly income at the selected age is ${formatCurrency(incomeSources.totalMonthlyIncome)}/month.`,
+    cpf.enabled ? `CPF LIFE contributes ${formatCurrency(cpf.cpfLifeMonthlyPayout)}/month from age ${cpf.cpfLifePayoutStartAge}.` : 'CPF LIFE has not been included in this illustration.',
+    `The current projection shows an ${gapLabel} of ${formatCurrency(Math.abs(needs.surplusShortfall))}.`,
+    planningOpportunity,
+  ];
+
+  return (
+    <section className="panel key-takeaways-panel">
+      <div className="section-header">
+        <div>
+          <h2>Key Takeaways</h2>
+          <p className="section-subtext">A short client-facing summary based on the current assumptions.</p>
+        </div>
+      </div>
+      <ol className="key-takeaway-list">
+        {takeaways.map((takeaway) => (
+          <li key={takeaway}>{takeaway}</li>
+        ))}
+      </ol>
+    </section>
   );
 }

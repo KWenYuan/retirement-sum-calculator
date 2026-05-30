@@ -26,6 +26,7 @@ import {
 } from '../utils/projections.js';
 
 export function Dashboard({
+  viewMode = 'advisor',
   profile,
   cpf,
   srs,
@@ -39,6 +40,8 @@ export function Dashboard({
   setSelectedAge,
   retirementPoint,
   needs,
+  payoutSummary,
+  incomeSources,
   startLater,
   advisorInsight,
   setAdvisorInsight,
@@ -51,6 +54,7 @@ export function Dashboard({
   dataMessage,
   dataError,
 }) {
+  const isPresentation = viewMode === 'presentation';
   const [chartView, setChartView] = useState('total-components');
   const [highlightedSeries, setHighlightedSeries] = useState(null);
   const { chartData, series } = useMemo(
@@ -79,16 +83,25 @@ export function Dashboard({
       <section className="hero-panel">
         <div>
           <p className="client-label">{profile.clientName || 'Client'}</p>
-          <h1>Retirement projection at age {profile.retirementAge}</h1>
+          <h1>{isPresentation ? 'Retirement projection summary' : `Retirement projection at age ${profile.retirementAge}`}</h1>
           <p className="hero-subtitle">A meeting-ready view of CPF, SRS, policies, investments and cash against the client’s retirement income target.</p>
+          {isPresentation && (
+            <div className="presentation-hero-stats">
+              <HeroStat label="Current age" value={profile.currentAge} />
+              <HeroStat label="Retirement age" value={profile.retirementAge} />
+              <HeroStat label="Desired income" value={`${formatCurrency(profile.desiredMonthlyIncome)}/month`} />
+              <HeroStat label={needs.surplusShortfall >= 0 ? 'Projected surplus' : 'Projected shortfall'} value={formatCurrency(needs.surplusShortfall)} />
+            </div>
+          )}
         </div>
       </section>
 
       {exportError && <div className="export-error">{exportError}</div>}
-      {dataError && <div className="export-error">{dataError}</div>}
-      {dataMessage && <div className="data-message">{dataMessage}</div>}
+      {!isPresentation && dataError && <div className="export-error">{dataError}</div>}
+      {!isPresentation && dataMessage && <div className="data-message">{dataMessage}</div>}
 
-      <section className="panel data-export-panel">
+      {!isPresentation && (
+        <section className="panel data-export-panel">
         <div>
           <h2>Data & Export</h2>
           <p>Export a client PDF report, or save and restore calculator inputs for future reviews.</p>
@@ -111,9 +124,10 @@ export function Dashboard({
             Clear Saved Data
           </button>
         </div>
-      </section>
+        </section>
+      )}
 
-      <section className="metric-grid">
+      <section className={`metric-grid ${isPresentation ? 'presentation-metric-grid' : ''}`}>
         <MetricCard label="Projected retirement amount" value={formatCurrency(retirementPoint.total)} tone="navy" />
         <MetricCard label="Required retirement amount" value={formatCurrency(needs.requiredAmount)} />
         <MetricCard
@@ -121,7 +135,15 @@ export function Dashboard({
           value={formatCurrency(needs.surplusShortfall)}
           tone={needs.surplusShortfall >= 0 ? 'positive' : 'alert'}
         />
-        <MetricCard label="Monthly investment to close gap" value={formatCurrency(needs.monthlyNeeded)} />
+        {isPresentation ? (
+          <>
+            <MetricCard label="Projected monthly income" value={`${formatCurrency(incomeSources.totalMonthlyIncome)}/month`} />
+            <MetricCard label={`Total lump sum at age ${selectedAge}`} value={formatCurrency(payoutSummary.lumpSum)} />
+            <MetricCard label={`Combined monthly equivalent at age ${selectedAge}`} value={`${formatCurrency(payoutSummary.combinedMonthlyEquivalent)}/month`} tone="positive" />
+          </>
+        ) : (
+          <MetricCard label="Monthly investment to close gap" value={formatCurrency(needs.monthlyNeeded)} />
+        )}
       </section>
 
       <section className="panel chart-panel">
@@ -261,7 +283,8 @@ export function Dashboard({
         </section>
       </section>
 
-      <section className="panel">
+      {!isPresentation && (
+        <section className="panel">
         <div className="section-header">
           <h2>Start Now vs Start Later</h2>
           <TrendingUp size={18} />
@@ -275,9 +298,11 @@ export function Dashboard({
             </div>
           ))}
         </div>
-      </section>
+        </section>
+      )}
 
-      <section className="panel advisor-panel">
+      {!isPresentation && (
+        <section className="panel advisor-panel">
         <div className="section-header">
           <h2>Advisor Insight</h2>
           <FileText size={18} />
@@ -287,8 +312,18 @@ export function Dashboard({
           onChange={(event) => setAdvisorInsight(event.target.value)}
           placeholder="Type your custom client notes here..."
         />
-      </section>
+        </section>
+      )}
     </main>
+  );
+}
+
+function HeroStat({ label, value }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -307,10 +342,11 @@ function ProjectionTooltip({ active, label, payload, series, highlightedSeries }
   const displayedSeries = highlightedSeries
     ? series.filter((item) => item.key === highlightedSeries)
     : series;
+  const tooltipSeries = displayedSeries.length > 0 ? displayedSeries : series;
   return (
     <div className="projection-tooltip">
       <strong>Age {label}</strong>
-      {displayedSeries.map((item) => (
+      {tooltipSeries.map((item) => (
         values.has(item.key) && (
           <div key={item.key}>
             <span><i style={{ background: item.color }} /> {item.name}</span>
