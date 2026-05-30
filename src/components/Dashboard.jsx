@@ -14,6 +14,7 @@ import {
   YAxis,
 } from 'recharts';
 import { Database, Download, FileText, FolderUp, Trash2, TrendingUp } from 'lucide-react';
+import { ASSET_COLORS, BREAKDOWN_COLORS, INVESTMENT_COLORS, POLICY_COLORS } from '../utils/chartColors.js';
 import {
   formatCurrency,
   isCashIncludedInProjection,
@@ -23,16 +24,6 @@ import {
   projectPolicy,
   projectSrs,
 } from '../utils/projections.js';
-
-const COLORS = ['#15345f', '#c49a43', '#4d7ea8', '#78a083', '#d9a441'];
-const SERIES_COLORS = {
-  total: '#102a4c',
-  cpf: '#4d7ea8',
-  srs: '#2f855a',
-  cash: '#7b8492',
-  policy: ['#c49a43', '#d9a441', '#b7791f', '#f0b84a'],
-  investment: ['#7b61a8', '#8f72c7', '#5f4b8b', '#a88bd8'],
-};
 
 export function Dashboard({
   profile,
@@ -62,7 +53,6 @@ export function Dashboard({
 }) {
   const [chartView, setChartView] = useState('total-components');
   const [highlightedSeries, setHighlightedSeries] = useState(null);
-  const timelineEndAge = timeline[timeline.length - 1]?.age || profile.retirementAge;
   const { chartData, series } = useMemo(
     () => buildProjectionSeries({ profile, cpf, srs, policies, investments, cash, scenarioRate, timeline }),
     [profile, cpf, srs, policies, investments, cash, scenarioRate, timeline],
@@ -161,11 +151,16 @@ export function Dashboard({
         <div className="projection-chart-layout">
           <div className="chart-height large">
             <ResponsiveContainer>
-              <LineChart data={chartData} margin={{ top: 10, right: 18, bottom: 0, left: 8 }}>
+              <LineChart
+                data={chartData}
+                margin={{ top: 10, right: 18, bottom: 0, left: 8 }}
+                onClick={(state) => updateSelectedAgeFromChart(state, setSelectedAge)}
+                onMouseMove={(state) => updateSelectedAgeFromChart(state, setSelectedAge)}
+              >
                 <CartesianGrid stroke="#e6ebf2" vertical={false} />
                 <XAxis dataKey="age" tickLine={false} axisLine={false} />
                 <YAxis tickFormatter={(value) => formatCurrency(value, true)} tickLine={false} axisLine={false} width={74} />
-                <Tooltip content={<ProjectionTooltip series={series} />} />
+                <Tooltip content={<ProjectionTooltip series={visibleSeries} highlightedSeries={highlightedSeries} />} />
                 {visibleSeries.map((item) => {
                   const isHighlighted = !highlightedSeries || highlightedSeries === item.key;
                   return (
@@ -204,14 +199,6 @@ export function Dashboard({
             })}
           </div>
         </div>
-        <input
-          className="age-slider"
-          type="range"
-          min={profile.currentAge}
-          max={timelineEndAge}
-          value={selectedAge}
-          onChange={(event) => setSelectedAge(Number(event.target.value))}
-        />
       </section>
 
       <section className="dashboard-grid">
@@ -224,8 +211,8 @@ export function Dashboard({
             <ResponsiveContainer>
               <PieChart>
                 <Pie data={breakdownData} innerRadius={62} outerRadius={92} paddingAngle={3} dataKey="value">
-                  {breakdownData.map((entry, index) => (
-                    <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                  {breakdownData.map((entry) => (
+                    <Cell key={entry.name} fill={BREAKDOWN_COLORS[entry.name] || ASSET_COLORS.total} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(value) => formatCurrency(value)} />
@@ -233,9 +220,9 @@ export function Dashboard({
             </ResponsiveContainer>
           </div>
           <div className="legend-list">
-            {breakdownData.map((item, index) => (
+            {breakdownData.map((item) => (
               <div key={item.name}>
-                <span style={{ background: COLORS[index % COLORS.length] }} />
+                <span style={{ background: BREAKDOWN_COLORS[item.name] || ASSET_COLORS.total }} />
                 <p>{item.name}</p>
                 <strong>{formatCurrency(item.value)}</strong>
               </div>
@@ -314,13 +301,16 @@ function MetricCard({ label, value, tone }) {
   );
 }
 
-function ProjectionTooltip({ active, label, payload, series }) {
+function ProjectionTooltip({ active, label, payload, series, highlightedSeries }) {
   if (!active || !payload?.length) return null;
   const values = new Map(payload.map((item) => [item.dataKey, item.value]));
+  const displayedSeries = highlightedSeries
+    ? series.filter((item) => item.key === highlightedSeries)
+    : series;
   return (
     <div className="projection-tooltip">
       <strong>Age {label}</strong>
-      {series.map((item) => (
+      {displayedSeries.map((item) => (
         values.has(item.key) && (
           <div key={item.key}>
             <span><i style={{ background: item.color }} /> {item.name}</span>
@@ -332,15 +322,20 @@ function ProjectionTooltip({ active, label, payload, series }) {
   );
 }
 
+function updateSelectedAgeFromChart(state, setSelectedAge) {
+  const nextAge = Number(state?.activeLabel);
+  if (Number.isFinite(nextAge)) setSelectedAge(nextAge);
+}
+
 function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash, scenarioRate, timeline }) {
-  const series = [{ key: 'total', name: 'Total', color: SERIES_COLORS.total }];
-  if (cpf.enabled) series.push({ key: 'cpf', name: 'CPF', color: SERIES_COLORS.cpf });
-  if (srs.enabled) series.push({ key: 'srs', name: 'SRS', color: SERIES_COLORS.srs });
+  const series = [{ key: 'total', name: 'Total', color: ASSET_COLORS.total }];
+  if (cpf.enabled) series.push({ key: 'cpf', name: 'CPF', color: ASSET_COLORS.cpf });
+  if (srs.enabled) series.push({ key: 'srs', name: 'SRS', color: ASSET_COLORS.srs });
   policies.forEach((policy, index) => {
     series.push({
       key: `policy_${policy.id}`,
       name: policy.name || `Policy ${index + 1}`,
-      color: SERIES_COLORS.policy[index % SERIES_COLORS.policy.length],
+      color: POLICY_COLORS[index % POLICY_COLORS.length],
     });
   });
   investments.forEach((investment, index) => {
@@ -348,10 +343,10 @@ function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash,
     series.push({
       key: `investment_${investment.id}`,
       name: investment.name || `Investment ${index + 1}`,
-      color: SERIES_COLORS.investment[index % SERIES_COLORS.investment.length],
+      color: INVESTMENT_COLORS[index % INVESTMENT_COLORS.length],
     });
   });
-  if (isCashIncludedInProjection(cash)) series.push({ key: 'cash', name: 'Cash / Savings', color: SERIES_COLORS.cash });
+  if (isCashIncludedInProjection(cash)) series.push({ key: 'cash', name: 'Cash / Savings', color: ASSET_COLORS.cash });
 
   const chartData = timeline.map((point) => {
     const age = Number(point.age);

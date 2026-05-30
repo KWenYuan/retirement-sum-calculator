@@ -46,6 +46,7 @@ export function ExportReport({
   const timelineRows = buildMilestoneRows({
     retirementTimeline,
   });
+  const timelineVisualRows = timelineRows.slice(0, 8);
   const cpf55 = buildCpf55Summary(profile, cpf);
   const srsSummary = buildSrsSummary(profile, srs);
   const personalInvestmentRows = investments.map((investment) => {
@@ -160,7 +161,19 @@ export function ExportReport({
       )}
 
       <section className="export-section page-break">
-        <h2>Retirement Timeline Summary</h2>
+        <h2>Retirement Timeline</h2>
+        <div className="export-timeline-visual">
+          {timelineVisualRows.length === 0 ? (
+            <p className="export-note">No retirement timeline events entered.</p>
+          ) : timelineVisualRows.map(([age, type, event, amountIncome, duration], index) => (
+            <div className={`export-timeline-item ${type.toLowerCase().includes('income') ? 'income' : 'lump'}`} key={`${age}-${event}-${index}`}>
+              <span>Age {age}</span>
+              <strong>{event}</strong>
+              <small>{amountIncome} | {duration}</small>
+            </div>
+          ))}
+        </div>
+        <h3 className="export-subheading">Timeline Summary Table</h3>
         <SimpleTable headers={['Age', 'Type', 'Event', 'Amount / Income', 'Duration']} rows={timelineRows} />
       </section>
 

@@ -21,6 +21,7 @@ export function RetirementTimeline({
     span,
   );
   const showCashLegend = hasCashTimelineItems(timeline);
+  const showSrsLegend = hasSrsTimelineItems(timeline);
   const topLaneCount = Math.max(1, topStreamRows.length);
   const bottomLaneCount = Math.max(1, bottomStreamRows.length);
   const payoutSummary = calculatePayoutSummary(ageDetails);
@@ -33,7 +34,7 @@ export function RetirementTimeline({
           <p className="section-subtext">One line showing lump sums, income starts, and important retirement ages.</p>
         </div>
         <div className="timeline-header-tools">
-          <TimelineLegend showCash={showCashLegend} />
+          <TimelineLegend showCash={showCashLegend} showSrs={showSrsLegend} />
           <div className="timeline-selected-age">
             <div className="selected-age-copy">
               <span>Selected age</span>
@@ -248,12 +249,13 @@ function StreamBar({ stream, placement, rowIndex, rowCount, setSelectedAge }) {
   );
 }
 
-function TimelineLegend({ showCash }) {
+function TimelineLegend({ showCash, showSrs }) {
   return (
     <div className="timeline-legend" aria-label="Timeline legend">
       <span><i className="legend-dot legend-lump" /> Lump Sum</span>
       <span><i className="legend-line legend-income" /> Income Stream</span>
       <span><i className="legend-dot category-cpf" /> CPF</span>
+      {showSrs && <span><i className="legend-dot category-srs" /> SRS</span>}
       <span><i className="legend-dot category-policy" /> Policy</span>
       <span><i className="legend-dot category-investment" /> Investment</span>
       {showCash && <span><i className="legend-dot category-cash" /> Cash / Savings</span>}
@@ -268,10 +270,10 @@ function getStartingStreams(streams, age) {
 function getCategoryClass(category = '') {
   const normalized = category.toLowerCase();
   if (normalized.includes('cpf')) return 'category-cpf';
+  if (normalized.includes('srs')) return 'category-srs';
   if (normalized.includes('policy')) return 'category-policy';
   if (normalized.includes('investment')) return 'category-investment';
   if (normalized.includes('cash')) return 'category-cash';
-  if (normalized.includes('srs')) return 'category-income';
   return 'category-lump';
 }
 
@@ -284,6 +286,11 @@ function isUpperStream(stream) {
 function hasCashTimelineItems(timeline) {
   return [...(timeline.milestones || []), ...(timeline.incomeStreams || [])]
     .some((item) => (item.category || '').toLowerCase().includes('cash'));
+}
+
+function hasSrsTimelineItems(timeline) {
+  return [...(timeline.milestones || []), ...(timeline.incomeStreams || [])]
+    .some((item) => (item.category || '').toLowerCase().includes('srs'));
 }
 
 function assignStreamRows(streams, span) {

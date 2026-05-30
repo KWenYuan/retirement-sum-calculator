@@ -5,9 +5,8 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
+import { getIncomeSourceColor } from '../utils/chartColors.js';
 import { formatCurrency } from '../utils/projections.js';
-
-const INCOME_COLORS = ['#15345f', '#4d7ea8', '#78a083', '#7b61a8', '#7b8492', '#c49a43'];
 
 export function RetirementIncomeSources({ incomeSources }) {
   return (
@@ -47,7 +46,7 @@ export function RetirementIncomeSources({ incomeSources }) {
               <PieChart>
                 <Pie data={incomeSources.sources} dataKey="monthlyIncome" nameKey="source" innerRadius={58} outerRadius={88} paddingAngle={3}>
                   {incomeSources.sources.map((entry, index) => (
-                    <Cell key={entry.source} fill={INCOME_COLORS[index % INCOME_COLORS.length]} />
+                    <Cell key={entry.source} fill={getIncomeSourceColor(entry.source, index)} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(value) => `${formatCurrency(value)}/month`} />
@@ -60,7 +59,7 @@ export function RetirementIncomeSources({ incomeSources }) {
       <div className="income-source-table">
         {incomeSources.sources.map((item, index) => (
           <div key={item.source}>
-            <span style={{ background: INCOME_COLORS[index % INCOME_COLORS.length] }} />
+            <span style={{ background: getIncomeSourceColor(item.source, index) }} />
             <p>{item.source}</p>
             <strong>{formatCurrency(item.monthlyIncome)}/month</strong>
             <em>{Math.round(item.percentage)}%</em>
