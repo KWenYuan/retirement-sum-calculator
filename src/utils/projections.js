@@ -54,6 +54,28 @@ export const projectCpf = (cpf, years) => {
   );
 };
 
+export const projectCpfAtAge = (cpf, currentAge, targetAge) => {
+  if (!cpf.enabled) return 0;
+  const startAge = asNumber(currentAge);
+  const endAge = asNumber(targetAge);
+  const years = Math.max(0, endAge - startAge);
+  const payoutStartAge = asNumber(cpf.cpfLifePayoutStartAge) || 65;
+  const annualPayout = asNumber(cpf.cpfLifeMonthlyPayout) * 12;
+
+  if (endAge <= payoutStartAge || annualPayout <= 0) return projectCpf(cpf, years);
+
+  const yearsToPayoutStart = Math.max(0, payoutStartAge - startAge);
+  let value = projectCpf(cpf, yearsToPayoutStart);
+  const annualRate = rate(cpf.annualInterest);
+  const drawdownYears = Math.max(0, Math.floor(endAge - payoutStartAge));
+
+  for (let year = 0; year < drawdownYears; year += 1) {
+    value = Math.max(0, value * (1 + annualRate) - annualPayout);
+  }
+
+  return value;
+};
+
 export const projectCpfOaSa = (cpf, currentAge, targetAge) => {
   if (!cpf.enabled) return 0;
   const years = Math.max(0, asNumber(targetAge) - asNumber(currentAge));
@@ -67,10 +89,30 @@ export const projectCpfOaSa = (cpf, currentAge, targetAge) => {
 };
 
 export const projectSrs = (srs, currentAge, targetAge) => {
-  if (!srs.enabled || currentAge >= srs.withdrawalAge) return srs.enabled ? asNumber(srs.currentBalance) : 0;
-  const years = Math.max(0, Math.min(targetAge, asNumber(srs.withdrawalAge)) - currentAge);
-  return compoundAnnual(srs.currentBalance, srs.annualReturn, years) +
-    annualContributionFutureValue(srs.annualContribution, srs.annualReturn, years);
+  if (!srs.enabled) return 0;
+  const startAge = asNumber(currentAge);
+  const selectedAge = asNumber(targetAge);
+  const withdrawalStartAge = asNumber(srs.withdrawalStartAge) || asNumber(srs.withdrawalAge);
+  const withdrawalDuration = Math.max(1, asNumber(srs.withdrawalDurationYears) || 1);
+  const accumulationYears = Math.max(0, Math.min(selectedAge, withdrawalStartAge) - startAge);
+  const accumulatedValue = compoundAnnual(srs.currentBalance, srs.annualReturn, accumulationYears) +
+    annualContributionFutureValue(srs.annualContribution, srs.annualReturn, accumulationYears);
+
+  if (selectedAge <= withdrawalStartAge) return accumulatedValue;
+
+  const annualWithdrawal = accumulatedValue / withdrawalDuration;
+  const drawdownYears = Math.min(
+    Math.max(0, Math.floor(selectedAge - withdrawalStartAge)),
+    withdrawalDuration,
+  );
+  let remainingValue = accumulatedValue;
+  const annualRate = rate(srs.annualReturn);
+
+  for (let year = 0; year < drawdownYears; year += 1) {
+    remainingValue = Math.max(0, remainingValue * (1 + annualRate) - annualWithdrawal);
+  }
+
+  return remainingValue;
 };
 
 export const projectPolicy = (policy, currentAge, targetAge, scenarioRate) => {
@@ -80,17 +122,70 @@ export const projectPolicy = (policy, currentAge, targetAge, scenarioRate) => {
 
 const projectPolicyWithContributionDelay = (policy, currentAge, targetAge, scenarioRate, delayYears = 0, totalYears = null) => {
   const years = totalYears ?? Math.max(0, targetAge - currentAge);
+  const selectedAge = asNumber(currentAge) + years;
   const structure = getPolicyStructure(policy, targetAge);
-  if (structure.withdrawalType !== 'Keep invested / no withdrawal yet' && targetAge > structure.withdrawalStartAge) return 0;
-
   const annualPremium = asNumber(policy.premiumAmount) * (frequencyMultiplier[policy.premiumFrequency] || 12);
-  const remainingPremiumYears = Math.max(0, structure.premiumEndAge - currentAge - delayYears);
-  const contributionYears = Math.max(0, Math.min(years - delayYears, remainingPremiumYears));
   const effectiveRate = getEffectiveRate(policy.annualReturn, policy.useScenarioReturn, scenarioRate);
+  const accumulatedValue = projectPolicyAccumulatedValue({
+    policy,
+    structure,
+    currentAge: asNumber(currentAge),
+    targetAge: selectedAge,
+    annualPremium,
+    effectiveRate,
+    delayYears,
+  });
 
+  if (structure.withdrawalType === 'Keep invested / no withdrawal yet') return accumulatedValue;
+  if (structure.withdrawalType === 'Lump sum') {
+    return selectedAge > structure.withdrawalStartAge ? 0 : accumulatedValue;
+  }
+  if (selectedAge <= structure.withdrawalStartAge) return accumulatedValue;
+
+  const valueAtWithdrawalStart = projectPolicyAccumulatedValue({
+    policy,
+    structure,
+    currentAge: asNumber(currentAge),
+    targetAge: structure.withdrawalStartAge,
+    annualPremium,
+    effectiveRate,
+    delayYears,
+  });
+  const annualPayout = valueAtWithdrawalStart / structure.withdrawalDuration;
+  const drawdownYears = Math.min(
+    Math.max(0, Math.floor(selectedAge - structure.withdrawalStartAge)),
+    structure.withdrawalDuration,
+  );
+
+  let remainingValue = valueAtWithdrawalStart;
+  const annualRate = rate(effectiveRate);
+  for (let year = 0; year < drawdownYears; year += 1) {
+    remainingValue = Math.max(0, remainingValue * (1 + annualRate) - annualPayout);
+  }
+
+  return remainingValue;
+};
+
+const projectPolicyAccumulatedValue = ({
+  policy,
+  structure,
+  currentAge,
+  targetAge,
+  annualPremium,
+  effectiveRate,
+  delayYears = 0,
+}) => {
+  const years = Math.max(0, asNumber(targetAge) - asNumber(currentAge));
+  const contributionStartAge = Math.max(
+    asNumber(currentAge) + asNumber(delayYears),
+    structure.startAge,
+  );
+  const contributionEndAge = Math.min(asNumber(targetAge), structure.premiumEndAge);
+  const contributionYears = Math.max(0, contributionEndAge - contributionStartAge);
+  const yearsAfterContributionEnd = Math.max(0, asNumber(targetAge) - contributionStartAge - contributionYears);
   const currentGrowth = compoundAnnual(policy.currentValue, effectiveRate, years);
   const premiumGrowthToPaymentEnd = annualContributionFutureValue(annualPremium, effectiveRate, contributionYears);
-  const premiumGrowthToTarget = compoundAnnual(premiumGrowthToPaymentEnd, effectiveRate, years - delayYears - contributionYears);
+  const premiumGrowthToTarget = compoundAnnual(premiumGrowthToPaymentEnd, effectiveRate, yearsAfterContributionEnd);
   return currentGrowth + premiumGrowthToTarget;
 };
 
@@ -143,8 +238,9 @@ export const isCashIncludedInProjection = (cash = {}) => cash.includeCashInProje
 
 export const calculateAtAge = ({ profile, cpf, srs, policies, investments, cash, scenarioRate, age }) => {
   const years = Math.max(0, asNumber(age) - asNumber(profile.currentAge));
-  const cpfValue = cpf.includeInTotal ? projectCpf(cpf, years) : 0;
-  const visibleCpfValue = projectCpf(cpf, years);
+  const cpfAtAge = projectCpfAtAge(cpf, profile.currentAge, age);
+  const cpfValue = cpf.includeInTotal ? cpfAtAge : 0;
+  const visibleCpfValue = cpfAtAge;
   const srsValue = projectSrs(srs, asNumber(profile.currentAge), asNumber(age));
   const policyValue = policies.reduce(
     (total, policy) => total + projectPolicy(policy, asNumber(profile.currentAge), asNumber(age), scenarioRate),

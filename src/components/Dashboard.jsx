@@ -19,7 +19,7 @@ import {
   formatCurrency,
   isCashIncludedInProjection,
   projectCash,
-  projectCpf,
+  projectCpfAtAge,
   projectInvestment,
   projectPolicy,
   projectSrs,
@@ -388,7 +388,7 @@ function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash,
     const age = Number(point.age);
     const years = Math.max(0, age - Number(profile.currentAge));
     const row = { age, total: point.total };
-    if (cpf.enabled) row.cpf = projectCpf(cpf, years);
+    if (cpf.enabled) row.cpf = projectCpfAtAge(cpf, profile.currentAge, age);
     if (srs.enabled) row.srs = projectSrs(srs, Number(profile.currentAge), age);
     policies.forEach((policy) => {
       row[`policy_${policy.id}`] = projectPolicy(policy, Number(profile.currentAge), age, scenarioRate);

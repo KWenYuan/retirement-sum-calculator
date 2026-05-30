@@ -249,14 +249,16 @@ function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePo
   const projectedValue = projectPolicy(policy, Number(profile.currentAge), structure.withdrawalStartAge || structure.holdingUntilAge, scenarioRate);
   const payout = getPolicyPayoutSummary(policy, projectedValue, structure);
   const explanation = getPolicyExplanation(policy, projectedValue, structure);
+  const premiumSummary = getPolicyPremiumSummary(policy, structure);
   return (
     <div className="compact-item-card">
       <div className="compact-item-summary">
         <div>
           <strong>{policy.name || 'Policy'}</strong>
-          <span>Premium: {formatCurrency(policy.premiumAmount)}/{frequencyShortLabel(policy.premiumFrequency)} for {structure.premiumCommitmentTerm} years</span>
-          <span>Premium period: Age {structure.startAge}-{structure.commitmentEndAge}</span>
-          <span>Holding period: Age {structure.commitmentEndAge}-{structure.holdingUntilAge}</span>
+          <span>{premiumSummary.label}</span>
+          <span>Premium period: Age {structure.startAge}-{structure.premiumEndAge}</span>
+          {policy.startYear && <span>Start year: {policy.startYear}</span>}
+          <span>Holding period: Age {structure.premiumEndAge}-{structure.holdingUntilAge}</span>
           <span>Withdrawal: {payout.label}</span>
         </div>
         <div className="compact-item-value">
@@ -265,8 +267,8 @@ function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePo
         </div>
       </div>
       <div className="policy-phase-badges">
-        <span>Paying premiums: Age {structure.startAge}-{structure.commitmentEndAge}</span>
-        {structure.holdingUntilAge > structure.commitmentEndAge && <span>Compounding: Age {structure.commitmentEndAge}-{structure.holdingUntilAge}</span>}
+        <span>Paying premiums: Age {structure.startAge}-{structure.premiumEndAge}</span>
+        {structure.holdingUntilAge > structure.premiumEndAge && <span>Compounding: Age {structure.premiumEndAge}-{structure.holdingUntilAge}</span>}
         <span>{payout.badge}</span>
       </div>
       <div className="policy-mini-timeline">
@@ -277,7 +279,7 @@ function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePo
         </div>
         <div className="policy-mini-labels">
           <b>Age {structure.startAge}</b>
-          <b>Age {structure.commitmentEndAge}</b>
+          <b>Age {structure.premiumEndAge}</b>
           <b>Age {structure.holdingUntilAge}</b>
         </div>
         <div className="policy-mini-phases">
@@ -310,7 +312,8 @@ function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePo
             <SelectField label="Withdrawal type" value={policy.withdrawalType || 'Lump sum'} onChange={(value) => updatePolicy(policy.id, 'withdrawalType', value)} options={['Lump sum', 'Monthly income', 'Yearly income', 'Keep invested / no withdrawal yet']} />
           </div>
           <div className="policy-derived-panel">
-            <span>Premium end age: <strong>{structure.commitmentEndAge}</strong></span>
+            <span>Premium commitment ends: <strong>{structure.commitmentEndAge}</strong></span>
+            <span>Projected premium end age: <strong>{structure.premiumEndAge}</strong></span>
             <span>Growth after commitment: <strong>{structure.postCommitmentGrowthYears} years</strong></span>
             {payout.amount && <span>Estimated payout: <strong>{payout.amount}</strong></span>}
           </div>
@@ -404,6 +407,18 @@ function frequencyShortLabel(frequency) {
   return 'year';
 }
 
+function getPolicyPremiumSummary(policy, structure) {
+  const premium = `${formatCurrency(policy.premiumAmount)}/${frequencyShortLabel(policy.premiumFrequency)}`;
+  if (policy.continuePremiumsAfterCommitment) {
+    return {
+      label: `Premium: ${premium} until age ${structure.premiumEndAge}`,
+    };
+  }
+  return {
+    label: `Premium: ${premium} for ${structure.premiumCommitmentTerm} years`,
+  };
+}
+
 function applyPolicyTemplate(policy, updatePolicy, structure, profile) {
   updatePolicy(policy.id, 'policyStructure', structure);
   if (structure === 'Investment policy with ongoing premium') {
@@ -454,12 +469,15 @@ function getPolicyPayoutSummary(policy, projectedValue, structure) {
 
 function getPolicyExplanation(policy, projectedValue, structure) {
   const premium = `${formatCurrency(policy.premiumAmount)}/${frequencyShortLabel(policy.premiumFrequency)}`;
+  const premiumPhrase = policy.continuePremiumsAfterCommitment
+    ? `You contribute ${premium} from age ${structure.startAge} to ${structure.premiumEndAge}.`
+    : `You contribute ${premium} for ${structure.premiumCommitmentTerm} years from age ${structure.startAge} to ${structure.commitmentEndAge}.`;
   if (structure.withdrawalType === 'Monthly income' || structure.withdrawalType === 'Yearly income') {
     const payout = getPolicyPayoutSummary(policy, projectedValue, structure).amount;
-    return `You contribute ${premium} for ${structure.premiumCommitmentTerm} years from age ${structure.startAge} to ${structure.commitmentEndAge}. The policy is then assumed to stay invested until age ${structure.withdrawalStartAge}. The projected value is converted into an estimated payout of ${payout} over ${structure.withdrawalDuration} years.`;
+    return `${premiumPhrase} The policy is then assumed to stay invested until age ${structure.withdrawalStartAge}. The projected value is converted into an estimated payout of ${payout} over ${structure.withdrawalDuration} years.`;
   }
   if (structure.withdrawalType === 'Keep invested / no withdrawal yet') {
-    return `You contribute ${premium} for ${structure.premiumCommitmentTerm} years from age ${structure.startAge} to ${structure.commitmentEndAge}. After that, the policy is assumed to remain invested through age ${structure.holdingUntilAge}, with no withdrawal selected yet.`;
+    return `${premiumPhrase} After that, the policy is assumed to remain invested through age ${structure.holdingUntilAge}, with no withdrawal selected yet.`;
   }
-  return `You contribute ${premium} for ${structure.premiumCommitmentTerm} years from age ${structure.startAge} to ${structure.commitmentEndAge}. After that, the policy is assumed to stay invested until age ${structure.withdrawalStartAge}. Based on the selected return assumption, the projected lump sum at age ${structure.withdrawalStartAge} is ${formatCurrency(projectedValue)}.`;
+  return `${premiumPhrase} After that, the policy is assumed to stay invested until age ${structure.withdrawalStartAge}. Based on the selected return assumption, the projected lump sum at age ${structure.withdrawalStartAge} is ${formatCurrency(projectedValue)}.`;
 }

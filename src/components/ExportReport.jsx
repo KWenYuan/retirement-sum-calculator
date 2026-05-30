@@ -186,8 +186,10 @@ export function ExportReport({
             const projectedValue = projectPolicy(policy, asNumber(profile.currentAge), structure.withdrawalStartAge || structure.holdingUntilAge, scenarioRate);
             return [
               policy.name || 'Policy',
-              `${formatCurrency(policy.premiumAmount)}/${policy.premiumFrequency || 'month'} for ${structure.premiumCommitmentTerm} years`,
-              `Age ${structure.startAge}-${structure.commitmentEndAge}`,
+              policy.continuePremiumsAfterCommitment
+                ? `${formatCurrency(policy.premiumAmount)}/${policy.premiumFrequency || 'month'} until age ${structure.premiumEndAge}`
+                : `${formatCurrency(policy.premiumAmount)}/${policy.premiumFrequency || 'month'} for ${structure.premiumCommitmentTerm} years`,
+              `Age ${structure.startAge}-${structure.premiumEndAge}`,
               `Age ${structure.holdingUntilAge}`,
               buildPolicyWithdrawalLabel(structure),
               formatCurrency(projectedValue),
