@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import html2pdf from 'html2pdf.js';
 import { BriefcaseBusiness, ShieldCheck } from 'lucide-react';
 import { Dashboard, ScenarioTabs } from './components/Dashboard.jsx';
+import { AnnualReview } from './components/AnnualReview.jsx';
 import { ExportReport } from './components/ExportReport.jsx';
+import { FollowUpTasks } from './components/FollowUpTasks.jsx';
+import { RetirementIncomeSources } from './components/RetirementIncomeSources.jsx';
 import { RetirementTimeline } from './components/RetirementTimeline.jsx';
 import {
   CashSection,
@@ -28,10 +31,17 @@ import {
   defaultAdvisorInsight,
   downloadClientData,
   importClientData,
+  importPreviousReviewData,
   loadClientDataFromStorage,
   saveClientDataToStorage,
 } from './utils/clientData.js';
 import {
+  buildAnnualReviewComparison,
+  buildChangedSinceLastReview,
+  buildReviewSnapshot,
+} from './utils/annualReview.js';
+import {
+  buildIncomeSources,
   buildRetirementTimeline,
   buildTimeline,
   calculateAtAge,
@@ -55,12 +65,16 @@ export default function App() {
   const [scenario, setScenario] = useState(savedState?.scenario || 'balanced');
   const [selectedAge, setSelectedAge] = useState(savedState?.selectedAge || defaultProfile.retirementAge);
   const [advisorInsight, setAdvisorInsight] = useState(savedState?.advisorInsight || defaultAdvisorInsight);
+  const [followUpTasks, setFollowUpTasks] = useState(savedState?.followUpTasks || []);
+  const [previousReviewData, setPreviousReviewData] = useState(savedState?.previousReviewData || null);
+  const [includeFollowUpTasksInPdf, setIncludeFollowUpTasksInPdf] = useState(savedState?.includeFollowUpTasksInPdf || false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [dataMessage, setDataMessage] = useState('');
   const [dataError, setDataError] = useState('');
   const exportReportRef = useRef(null);
   const importInputRef = useRef(null);
+  const previousReviewInputRef = useRef(null);
 
   const scenarioRate = SCENARIOS[scenario].returnRate;
   const retirementTimelineEndAge = getRetirementTimelineEndAge(profile);
@@ -82,6 +96,22 @@ export default function App() {
     () => getAgeTimelineDetails(retirementTimeline, clampedSelectedAge),
     [retirementTimeline, clampedSelectedAge],
   );
+  const incomeSources = useMemo(
+    () => buildIncomeSources({ profile, age: clampedSelectedAge, ageDetails }),
+    [profile, clampedSelectedAge, ageDetails],
+  );
+  const currentReviewSnapshot = useMemo(
+    () => buildReviewSnapshot({ profile, cpf, srs, policies, investments, cash, scenario }),
+    [profile, cpf, srs, policies, investments, cash, scenario],
+  );
+  const annualReviewComparison = useMemo(
+    () => buildAnnualReviewComparison(previousReviewData, { profile, cpf, srs, policies, investments, cash, scenario }, currentReviewSnapshot),
+    [previousReviewData, profile, cpf, srs, policies, investments, cash, scenario, currentReviewSnapshot],
+  );
+  const reviewChanges = useMemo(
+    () => buildChangedSinceLastReview(previousReviewData, { profile, cpf, srs, policies, investments, cash, scenario }, annualReviewComparison),
+    [previousReviewData, profile, cpf, srs, policies, investments, cash, scenario, annualReviewComparison],
+  );
 
   const exportDate = new Date().toLocaleDateString('en-CA');
   const clientDataState = useMemo(() => buildClientDataState({
@@ -94,7 +124,10 @@ export default function App() {
     scenario,
     selectedAge: clampedSelectedAge,
     advisorInsight,
-  }), [profile, cpf, srs, policies, investments, cash, scenario, clampedSelectedAge, advisorInsight]);
+    followUpTasks,
+    previousReviewData,
+    includeFollowUpTasksInPdf,
+  }), [profile, cpf, srs, policies, investments, cash, scenario, clampedSelectedAge, advisorInsight, followUpTasks, previousReviewData, includeFollowUpTasksInPdf]);
 
   useEffect(() => {
     saveClientDataToStorage(clientDataState);
@@ -141,6 +174,12 @@ export default function App() {
     importInputRef.current?.click();
   };
 
+  const requestImportPreviousReviewData = () => {
+    setDataError('');
+    setDataMessage('');
+    previousReviewInputRef.current?.click();
+  };
+
   const handleImportClientData = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -162,6 +201,30 @@ export default function App() {
     }
   };
 
+  const handleImportPreviousReviewData = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const reviewData = await importPreviousReviewData(file);
+      if (!reviewData) return;
+      setPreviousReviewData(reviewData);
+      setDataMessage('Previous review data imported for comparison.');
+      setDataError('');
+    } catch (error) {
+      console.error('Previous review import failed:', error);
+      setDataError(error.message || 'Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
+      setDataMessage('');
+    }
+  };
+
+  const clearPreviousReviewData = () => {
+    setPreviousReviewData(null);
+    setDataMessage('Previous review comparison cleared.');
+    setDataError('');
+  };
+
   const clearBrowserSavedData = () => {
     clearSavedClientData();
     setDataMessage('Saved browser data cleared.');
@@ -178,6 +241,9 @@ export default function App() {
     setScenario(state.scenario);
     setSelectedAge(state.selectedAge);
     setAdvisorInsight(state.advisorInsight);
+    setFollowUpTasks(state.followUpTasks);
+    setPreviousReviewData(state.previousReviewData);
+    setIncludeFollowUpTasksInPdf(state.includeFollowUpTasksInPdf);
   };
 
   return (
@@ -235,6 +301,23 @@ export default function App() {
             setSelectedAge={setSelectedAge}
             ageDetails={ageDetails}
           />
+
+          <RetirementIncomeSources incomeSources={incomeSources} />
+
+          <AnnualReview
+            previousReviewData={previousReviewData}
+            comparison={annualReviewComparison}
+            changes={reviewChanges}
+            importPreviousReviewData={requestImportPreviousReviewData}
+            clearPreviousReviewData={clearPreviousReviewData}
+          />
+
+          <FollowUpTasks
+            tasks={followUpTasks}
+            setTasks={setFollowUpTasks}
+            includeFollowUpTasksInPdf={includeFollowUpTasksInPdf}
+            setIncludeFollowUpTasksInPdf={setIncludeFollowUpTasksInPdf}
+          />
         </div>
 
         <section className="pdf-summary">
@@ -271,6 +354,11 @@ export default function App() {
             retirementPoint={retirementPoint}
             needs={needs}
             retirementTimeline={retirementTimeline}
+            incomeSources={incomeSources}
+            annualReviewComparison={annualReviewComparison}
+            reviewChanges={reviewChanges}
+            followUpTasks={followUpTasks}
+            includeFollowUpTasksInPdf={includeFollowUpTasksInPdf}
             advisorInsight={advisorInsight}
             disclaimer={disclaimer}
             exportDate={exportDate}
@@ -284,6 +372,13 @@ export default function App() {
         type="file"
         accept="application/json,.json"
         onChange={handleImportClientData}
+      />
+      <input
+        ref={previousReviewInputRef}
+        className="hidden-file-input"
+        type="file"
+        accept="application/json,.json"
+        onChange={handleImportPreviousReviewData}
       />
     </div>
   );

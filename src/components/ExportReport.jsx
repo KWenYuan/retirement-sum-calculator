@@ -5,6 +5,7 @@ import {
   projectInvestment,
   projectPolicy,
   projectSrs,
+  isCashIncludedInProjection,
 } from '../utils/projections.js';
 
 const asNumber = (value) => {
@@ -24,16 +25,22 @@ export function ExportReport({
   retirementPoint,
   needs,
   retirementTimeline,
+  incomeSources,
+  annualReviewComparison,
+  reviewChanges = [],
+  followUpTasks = [],
+  includeFollowUpTasksInPdf = false,
   advisorInsight,
   disclaimer,
   exportDate,
 }) {
+  const includeCash = isCashIncludedInProjection(cash);
   const assetBreakdown = [
     ['CPF', retirementPoint.cpf],
     ['SRS', retirementPoint.srs],
     ['Investment policies', retirementPoint.policies],
     ['Personal investments', retirementPoint.investments],
-    ['Cash / savings', retirementPoint.cash],
+    ...(includeCash ? [['Cash / savings', retirementPoint.cash]] : []),
     ['Total projected retirement amount', retirementPoint.total],
   ];
   const timelineRows = buildMilestoneRows({
@@ -97,6 +104,24 @@ export function ExportReport({
         <SimpleTable
           headers={['Asset type', 'Projected value']}
           rows={assetBreakdown.map(([label, value]) => [label, formatCurrency(value)])}
+        />
+      </section>
+
+      <section className="export-section avoid-break">
+        <h2>Retirement Income Sources</h2>
+        <div className="export-kpi-grid">
+          <SummaryBox label="Required monthly income" value={`${formatCurrency(incomeSources.requiredMonthlyIncome)}/month`} />
+          <SummaryBox label="Projected monthly income" value={`${formatCurrency(incomeSources.totalMonthlyIncome)}/month`} />
+          <SummaryBox label="Monthly surplus / shortfall" value={`${formatCurrency(incomeSources.surplusShortfall)}/month`} />
+        </div>
+        <SimpleTable
+          headers={['Source', 'Monthly income', 'Percentage']}
+          rows={incomeSources.sources.map((item) => [
+            item.source,
+            `${formatCurrency(item.monthlyIncome)}/month`,
+            `${Math.round(item.percentage)}%`,
+          ])}
+          emptyMessage="No active income streams at selected age."
         />
       </section>
 
@@ -170,22 +195,89 @@ export function ExportReport({
         />
       </section>
 
-      <section className="export-section avoid-break">
-        <h2>Cash / Savings Summary</h2>
-        <SimpleTable
-          headers={['Item', 'Estimate']}
-          rows={[
-            ['Available age', cashWithdrawalAge],
-            ['Projected accessible cash / savings', formatCurrency(cashProjectedValue)],
-            ['Emergency fund included', cash.includeEmergencyFund ? 'Yes' : 'No'],
-          ]}
-        />
-      </section>
+      {includeCash ? (
+        <section className="export-section avoid-break">
+          <h2>Cash / Savings Summary</h2>
+          <SimpleTable
+            headers={['Item', 'Estimate']}
+            rows={[
+              ['Available age', cashWithdrawalAge],
+              ['Projected accessible cash / savings', formatCurrency(cashProjectedValue)],
+              ['Emergency fund included', cash.includeEmergencyFund ? 'Yes' : 'No'],
+            ]}
+          />
+        </section>
+      ) : (
+        <section className="export-section avoid-break">
+          <h2>Cash / Savings</h2>
+          <p className="export-note">Cash / Savings excluded from projection.</p>
+        </section>
+      )}
 
       <section className="export-section avoid-break">
         <h2>Advisor Insight</h2>
         <p className="export-note">{advisorInsight || 'No advisor insight entered.'}</p>
       </section>
+
+      {annualReviewComparison && (
+        <section className="export-section avoid-break">
+          <h2>Annual Review Comparison</h2>
+          <SimpleTable
+            headers={['Item', 'Previous', 'Current', 'Difference']}
+            rows={[
+              [
+                'Projected retirement amount',
+                formatCurrency(annualReviewComparison.previousProjectedAmount),
+                formatCurrency(annualReviewComparison.currentProjectedAmount),
+                formatCurrency(annualReviewComparison.projectedAmountDifference),
+              ],
+              [
+                'Retirement gap',
+                formatCurrency(annualReviewComparison.previousGap),
+                formatCurrency(annualReviewComparison.currentGap),
+                formatCurrency(annualReviewComparison.gapDifference),
+              ],
+              [
+                'Projected monthly income',
+                `${formatCurrency(annualReviewComparison.previousMonthlyIncome)}/month`,
+                `${formatCurrency(annualReviewComparison.currentMonthlyIncome)}/month`,
+                `${formatCurrency(annualReviewComparison.monthlyIncomeDifference)}/month`,
+              ],
+            ]}
+          />
+          <p className="export-note">Status: {annualReviewComparison.status}. {annualReviewComparison.statusItems.join('. ')}.</p>
+        </section>
+      )}
+
+      {annualReviewComparison && (
+        <section className="export-section avoid-break">
+          <h2>What Changed Since Last Review</h2>
+          {reviewChanges.length === 0 ? (
+            <p className="export-note">No major changes detected since the previous review.</p>
+          ) : (
+            <SimpleTable
+              headers={['Area', 'Change']}
+              rows={reviewChanges.slice(0, 18).map((item) => [item.group, item.text])}
+            />
+          )}
+        </section>
+      )}
+
+      {includeFollowUpTasksInPdf && (
+        <section className="export-section avoid-break">
+          <h2>Follow-Up Actions</h2>
+          <SimpleTable
+            headers={['Task', 'Category', 'Due date', 'Status']}
+            rows={followUpTasks.map((task) => [
+              task.name || 'Follow-up task',
+              task.category || 'Other',
+              task.dueDate || 'Not set',
+              task.status || 'Not started',
+            ])}
+            emptyMessage="No follow-up tasks entered."
+          />
+        </section>
+      )}
 
       <section className="export-section avoid-break">
         <h2>Disclaimer</h2>

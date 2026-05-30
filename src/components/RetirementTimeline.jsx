@@ -1,5 +1,5 @@
 import { CalendarClock, CircleDollarSign } from 'lucide-react';
-import { formatCurrency } from '../utils/projections.js';
+import { calculatePayoutSummary, formatCurrency } from '../utils/projections.js';
 
 const timelineNote = 'CPF projections, FRS amounts, CPF LIFE payouts, policy values, withdrawals and investment returns are simplified estimates for illustration only. Actual values depend on CPF rules, policy terms, market returns, fees, withdrawals, taxation and prevailing regulations.';
 
@@ -20,9 +20,10 @@ export function RetirementTimeline({
     timeline.incomeStreams.filter((stream) => !isUpperStream(stream)),
     span,
   );
+  const showCashLegend = hasCashTimelineItems(timeline);
   const topLaneCount = Math.max(1, topStreamRows.length);
   const bottomLaneCount = Math.max(1, bottomStreamRows.length);
-  const payoutSummary = getPayoutSummary(ageDetails);
+  const payoutSummary = calculatePayoutSummary(ageDetails);
 
   return (
     <section className="panel retirement-timeline-panel simple-retirement-timeline">
@@ -32,7 +33,7 @@ export function RetirementTimeline({
           <p className="section-subtext">One line showing lump sums, income starts, and important retirement ages.</p>
         </div>
         <div className="timeline-header-tools">
-          <TimelineLegend />
+          <TimelineLegend showCash={showCashLegend} />
           <div className="timeline-selected-age">
             <div className="selected-age-copy">
               <span>Selected age</span>
@@ -247,7 +248,7 @@ function StreamBar({ stream, placement, rowIndex, rowCount, setSelectedAge }) {
   );
 }
 
-function TimelineLegend() {
+function TimelineLegend({ showCash }) {
   return (
     <div className="timeline-legend" aria-label="Timeline legend">
       <span><i className="legend-dot legend-lump" /> Lump Sum</span>
@@ -255,30 +256,13 @@ function TimelineLegend() {
       <span><i className="legend-dot category-cpf" /> CPF</span>
       <span><i className="legend-dot category-policy" /> Policy</span>
       <span><i className="legend-dot category-investment" /> Investment</span>
-      <span><i className="legend-dot category-cash" /> Cash / Savings</span>
+      {showCash && <span><i className="legend-dot category-cash" /> Cash / Savings</span>}
     </div>
   );
 }
 
 function getStartingStreams(streams, age) {
   return streams.filter((stream) => Math.round(stream.startAge) === Math.round(age));
-}
-
-function getPayoutSummary(ageDetails) {
-  const lumpSum = ageDetails.milestones.reduce((total, event) => total + (event.amount || 0), 0);
-  const monthlyIncome = ageDetails.incomeStreams
-    .filter((stream) => stream.frequency === 'monthly')
-    .reduce((total, stream) => total + (stream.amountPerPeriod || 0), 0);
-  const yearlyIncome = ageDetails.incomeStreams
-    .filter((stream) => stream.frequency !== 'monthly')
-    .reduce((total, stream) => total + (stream.amountPerPeriod || 0), 0);
-
-  return {
-    lumpSum,
-    monthlyIncome,
-    yearlyIncome,
-    combinedMonthlyEquivalent: monthlyIncome + yearlyIncome / 12,
-  };
 }
 
 function getCategoryClass(category = '') {
@@ -295,6 +279,11 @@ function isUpperStream(stream) {
   const category = (stream.category || '').toLowerCase();
   const title = (stream.title || '').toLowerCase();
   return category.includes('srs') || title.includes('srs');
+}
+
+function hasCashTimelineItems(timeline) {
+  return [...(timeline.milestones || []), ...(timeline.incomeStreams || [])]
+    .some((item) => (item.category || '').toLowerCase().includes('cash'));
 }
 
 function assignStreamRows(streams, span) {

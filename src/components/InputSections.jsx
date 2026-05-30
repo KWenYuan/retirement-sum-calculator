@@ -67,10 +67,15 @@ export function SrsSection({ srs, setSrs }) {
 
 export function CashSection({ cash, setCash }) {
   const update = (key, value) => setCash((current) => ({ ...current, [key]: value }));
+  const isIncluded = cash.includeCashInProjection !== false;
   return (
     <section className="panel">
-      <SectionHeader title="Cash / Savings" />
+      <SectionHeader
+        title="Cash / Savings"
+        action={!isIncluded && <span className="excluded-badge">Excluded from projection</span>}
+      />
       <div className="form-grid">
+        <Toggle label="Include Cash / Savings in retirement projection?" checked={isIncluded} onChange={(value) => update('includeCashInProjection', value)} />
         <NumberField label="Current cash savings" prefix="$" value={cash.currentSavings} onChange={(value) => update('currentSavings', value)} />
         <NumberField label="Monthly cash savings" prefix="$" value={cash.monthlySavings} onChange={(value) => update('monthlySavings', value)} />
         <NumberField label="Expected annual interest" suffix="%" step={0.1} value={cash.annualInterest} onChange={(value) => update('annualInterest', value)} />
@@ -82,6 +87,8 @@ export function CashSection({ cash, setCash }) {
         )}
         <Toggle label="Include emergency fund" checked={cash.includeEmergencyFund} onChange={(value) => update('includeEmergencyFund', value)} />
       </div>
+      <p className="field-helper">Turn this off if you want to keep cash as emergency funds or exclude it from retirement planning.</p>
+      {!isIncluded && <p className="excluded-note">Cash / Savings is currently excluded from retirement projections.</p>}
     </section>
   );
 }

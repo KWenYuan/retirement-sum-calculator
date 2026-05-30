@@ -111,6 +111,8 @@ export const projectCash = (cash, years) => {
   return futureValueWithMonthlyContributions(base, cash.monthlySavings, cash.annualInterest, years);
 };
 
+export const isCashIncludedInProjection = (cash = {}) => cash.includeCashInProjection !== false;
+
 export const calculateAtAge = ({ profile, cpf, srs, policies, investments, cash, scenarioRate, age }) => {
   const years = Math.max(0, asNumber(age) - asNumber(profile.currentAge));
   const cpfValue = cpf.includeInTotal ? projectCpf(cpf, years) : 0;
@@ -127,7 +129,7 @@ export const calculateAtAge = ({ profile, cpf, srs, policies, investments, cash,
     (total, investment) => total + projectInvestment(investment, years, scenarioRate),
     0,
   );
-  const cashValue = projectCash(cash, years);
+  const cashValue = isCashIncludedInProjection(cash) ? projectCash(cash, years) : 0;
   const total = cpfValue + srsValue + policyValue + investmentValue + cashValue;
 
   return {
@@ -314,7 +316,7 @@ export const buildRetirementTimeline = (state) => {
 
   const cashType = state.cash.withdrawalType || 'Lump sum';
   const cashWithdrawalAge = asNumber(state.cash.plannedWithdrawalAge);
-  if (cashWithdrawalAge && cashType !== 'Not shown on timeline') {
+  if (isCashIncludedInProjection(state.cash) && cashWithdrawalAge && cashType !== 'Not shown on timeline') {
     const projectedCash = projectCash(state.cash, Math.max(0, cashWithdrawalAge - startAge));
     if (cashType === 'Lump sum') {
       addLumpSum({
@@ -390,8 +392,93 @@ export const getAgeTimelineDetails = (retirementTimeline, age) => {
   const selectedAge = asNumber(age);
   return {
     milestones: retirementTimeline.milestones.filter((item) => Math.round(item.age) === Math.round(selectedAge)),
-    incomeStreams: retirementTimeline.incomeStreams.filter((item) => selectedAge >= item.startAge && selectedAge <= item.endAge),
+    incomeStreams: getActiveIncomeStreams(retirementTimeline.incomeStreams, selectedAge),
   };
+};
+
+export const getActiveIncomeStreams = (incomeStreams = [], age) => {
+  const selectedAge = asNumber(age);
+  return incomeStreams.filter((stream) => {
+    const starts = selectedAge >= asNumber(stream.startAge);
+    const ends = stream.duration === 'Lifetime' || stream.isLifetime
+      ? true
+      : selectedAge <= asNumber(stream.endAge);
+    return starts && ends;
+  });
+};
+
+export const getLumpSumEventsAtAge = (milestones = [], age) => {
+  const selectedAge = Math.round(asNumber(age));
+  return milestones.filter((item) => Math.round(asNumber(item.age)) === selectedAge);
+};
+
+export const calculatePayoutSummary = ({ milestones = [], incomeStreams = [], age }) => {
+  const activeIncomeStreams = typeof age === 'undefined'
+    ? incomeStreams
+    : getActiveIncomeStreams(incomeStreams, age);
+  const lumpSumEvents = typeof age === 'undefined'
+    ? milestones
+    : getLumpSumEventsAtAge(milestones, age);
+  const lumpSum = lumpSumEvents.reduce((total, event) => total + asNumber(event.amount), 0);
+  const monthlyIncome = activeIncomeStreams
+    .filter((stream) => stream.frequency === 'monthly')
+    .reduce((total, stream) => total + asNumber(stream.amountPerPeriod), 0);
+  const yearlyIncome = activeIncomeStreams
+    .filter((stream) => stream.frequency === 'yearly')
+    .reduce((total, stream) => total + asNumber(stream.amountPerPeriod), 0);
+
+  return {
+    lumpSum,
+    monthlyIncome,
+    yearlyIncome,
+    combinedMonthlyEquivalent: monthlyIncome + yearlyIncome / 12,
+  };
+};
+
+export const buildIncomeSources = ({ profile, age, ageDetails }) => {
+  const selectedAge = asNumber(age);
+  const yearsFromToday = Math.max(0, selectedAge - asNumber(profile.currentAge));
+  const requiredMonthlyIncome = asNumber(profile.desiredMonthlyIncome) *
+    (1 + rate(profile.inflationRate)) ** yearsFromToday;
+  const grouped = ageDetails.incomeStreams.reduce((items, stream) => {
+    const source = getIncomeSourceName(stream.category);
+    const monthlyAmount = stream.frequency === 'monthly'
+      ? asNumber(stream.amountPerPeriod)
+      : asNumber(stream.amountPerPeriod) / 12;
+    const existing = items.find((item) => item.source === source);
+    if (existing) {
+      existing.monthlyIncome += monthlyAmount;
+    } else {
+      items.push({ source, monthlyIncome: monthlyAmount });
+    }
+    return items;
+  }, []);
+  const totalMonthlyIncome = grouped.reduce((total, item) => total + item.monthlyIncome, 0);
+  const inflationFactor = (1 + rate(profile.inflationRate)) ** yearsFromToday;
+
+  return {
+    age: selectedAge,
+    totalMonthlyIncome,
+    requiredMonthlyIncome,
+    surplusShortfall: totalMonthlyIncome - requiredMonthlyIncome,
+    todayValueEquivalent: inflationFactor > 0 ? totalMonthlyIncome / inflationFactor : totalMonthlyIncome,
+    sources: grouped
+      .filter((item) => item.monthlyIncome > 0)
+      .map((item) => ({
+        ...item,
+        percentage: totalMonthlyIncome > 0 ? (item.monthlyIncome / totalMonthlyIncome) * 100 : 0,
+      })),
+  };
+};
+
+const getIncomeSourceName = (category = '') => {
+  const normalized = category.toLowerCase();
+  if (normalized.includes('cpf')) return 'CPF LIFE';
+  if (normalized.includes('srs')) return 'SRS withdrawal';
+  if (normalized.includes('policy')) return 'Policy income';
+  if (normalized.includes('investment')) return 'Investment withdrawal';
+  if (normalized.includes('cash')) return 'Cash / savings';
+  return 'Other income';
 };
 
 export const calculateNeeds = (profile, projectedAmount) => {

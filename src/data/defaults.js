@@ -43,6 +43,7 @@ export const defaultSrs = {
 };
 
 export const defaultCash = {
+  includeCashInProjection: true,
   currentSavings: 90000,
   monthlySavings: 1200,
   annualInterest: 1.5,

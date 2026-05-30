@@ -8,7 +8,7 @@ import {
 } from '../data/defaults.js';
 
 export const CLIENT_DATA_APP_NAME = 'Retirement Sum Calculator';
-export const CLIENT_DATA_SCHEMA_VERSION = 1;
+export const CLIENT_DATA_SCHEMA_VERSION = 2;
 export const CLIENT_DATA_STORAGE_KEY = 'retirement-sum-calculator-client-data';
 
 export const defaultAdvisorInsight = 'Client has strong income but most wealth is held in cash. Main opportunity is to improve long-term compounding and reduce inflation drag.';
@@ -32,6 +32,9 @@ export function buildClientDataState({
   scenario,
   selectedAge,
   advisorInsight,
+  followUpTasks = [],
+  previousReviewData = null,
+  includeFollowUpTasksInPdf = false,
 }) {
   return {
     profile,
@@ -43,6 +46,9 @@ export function buildClientDataState({
     scenario,
     selectedAge,
     advisorInsight,
+    followUpTasks,
+    previousReviewData,
+    includeFollowUpTasksInPdf,
   };
 }
 
@@ -75,6 +81,9 @@ export function restoreCalculatorState(data = {}) {
       ? Number(data.selectedAge)
       : Number(data.profile?.retirementAge || defaultProfile.retirementAge),
     advisorInsight: typeof data.advisorInsight === 'string' ? data.advisorInsight : defaultAdvisorInsight,
+    followUpTasks: normalizeTasks(data.followUpTasks),
+    previousReviewData: data.previousReviewData || null,
+    includeFollowUpTasksInPdf: Boolean(data.includeFollowUpTasksInPdf),
   };
 }
 
@@ -111,6 +120,32 @@ export async function importClientData(file) {
   }
 
   return restoreCalculatorState(payload.data);
+}
+
+export async function importPreviousReviewData(file) {
+  if (!file) return null;
+  const isJson = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
+  if (!isJson) {
+    throw new Error('Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch {
+    throw new Error('Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
+  }
+
+  const validation = validateImportPayload(payload);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  return {
+    exportedAt: payload.exportedAt || '',
+    schemaVersion: payload.schemaVersion,
+    data: restoreCalculatorState(payload.data),
+  };
 }
 
 export function saveClientDataToStorage(data) {
@@ -153,5 +188,17 @@ function normalizeList(value, defaults) {
     ...fallback,
     ...item,
     id: item?.id || `imported-${index + 1}`,
+  }));
+}
+
+function normalizeTasks(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((task, index) => ({
+    id: task?.id || `task-${index + 1}`,
+    name: task?.name || '',
+    category: task?.category || 'Other',
+    dueDate: task?.dueDate || '',
+    status: task?.status || 'Not started',
+    notes: task?.notes || '',
   }));
 }
