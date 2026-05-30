@@ -39,7 +39,7 @@ export function ExportReport({
   const includeCash = isCashIncludedInProjection(cash);
   const includeCpf = hasCpfProjectionData(cpf);
   const includeCpf55 = hasCpfFrsMilestoneData(cpf);
-  const includeCpfLife = includeCpf && asNumber(cpf.cpfLifeMonthlyPayout) > 0;
+  const currentAssets = calculateCurrentAssets({ cpf, srs, policies, investments, cash });
   const assetBreakdown = [
     ...(includeCpf ? [['CPF', retirementPoint.cpf]] : []),
     ['SRS', retirementPoint.srs],
@@ -75,10 +75,18 @@ export function ExportReport({
   return (
     <article className="export-report">
       <header className="export-cover avoid-break">
-        <p>Retirement Projection Summary</p>
-        <h1>{profile.clientName || 'Client'}</h1>
-        <div className="export-meta">
-          <span>Date of export: {exportDate}</span>
+        <div className="export-cover-content">
+          <div>
+            <p>Retirement Summary Report</p>
+            <h1>{profile.clientName || 'Client'}</h1>
+            <div className="export-meta">
+              <span>Prepared for: {profile.clientName || 'Client'}</span>
+              <span>Current age: {profile.currentAge}</span>
+              <span>Target retirement age: {profile.retirementAge}</span>
+              <span>Prepared on: {exportDate}</span>
+            </div>
+          </div>
+          <img className="export-logo" src="/logo.png" alt="Advisor logo" />
         </div>
       </header>
 
@@ -95,7 +103,16 @@ export function ExportReport({
       </section>
 
       <section className="export-section avoid-break">
-        <h2>Retirement Outcome</h2>
+        <h2>Current Assets Today</h2>
+        <SimpleTable
+          headers={['Asset Category', 'Current Value', 'Notes']}
+          rows={currentAssets.rows}
+          emptyMessage="No current assets entered."
+        />
+      </section>
+
+      <section className="export-section avoid-break">
+        <h2>Projected Retirement Position</h2>
         <div className="export-kpi-grid">
           <SummaryBox label="Projected retirement amount" value={formatCurrency(retirementPoint.total)} />
           <SummaryBox label="Required retirement amount" value={formatCurrency(needs.requiredAmount)} />
@@ -141,22 +158,15 @@ export function ExportReport({
               ['Estimated BRS', formatCurrency(cpf55.brs)],
               ['Estimated FRS', formatCurrency(cpf55.frs)],
               ['Estimated ERS', formatCurrency(cpf55.ers)],
+              ['Selected retirement sum assumption', cpf55.retirementSumType],
               ['Selected retirement sum amount', formatCurrency(cpf55.retirementSumAmount)],
+              ['Projected OA at age 55', formatCurrency(cpf55.projectedOa)],
+              ['Projected SA at age 55', formatCurrency(cpf55.projectedSa)],
               ['Projected OA + SA at age 55', formatCurrency(cpf55.projectedOaSa)],
               ['Estimated RA set aside', formatCurrency(cpf55.raSetAside)],
               ['Estimated withdrawable amount', formatCurrency(cpf55.withdrawableAmount)],
               [cpf55.shortfall > 0 ? 'Estimated shortfall' : 'Estimated excess', formatCurrency(cpf55.shortfall || cpf55.excess)],
             ]}
-          />
-        </section>
-      )}
-
-      {includeCpfLife && (
-        <section className="export-section avoid-break">
-          <h2>CPF LIFE Income</h2>
-          <SimpleTable
-            headers={['Start age', 'Estimated monthly payout']}
-            rows={[[cpf.cpfLifePayoutStartAge, formatCurrency(cpf.cpfLifeMonthlyPayout)]]}
           />
         </section>
       )}
@@ -338,13 +348,67 @@ function SimpleTable({ headers, rows, emptyMessage = 'No records entered.' }) {
             <td colSpan={headers.length}>{emptyMessage}</td>
           </tr>
         ) : rows.map((row, index) => (
-          <tr key={`${row.join('-')}-${index}`}>
+          <tr className={String(row[0]).startsWith('Total Current Assets Today') ? 'export-total-row' : ''} key={`${row.join('-')}-${index}`}>
             {row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`}>{cell}</td>)}
           </tr>
         ))}
       </tbody>
     </table>
   );
+}
+
+function calculateCurrentAssets({ cpf, srs, policies, investments, cash }) {
+  const rows = [];
+  let total = 0;
+
+  if (hasCpfProjectionData(cpf)) {
+    const oa = asNumber(cpf.oaBalance);
+    const sa = asNumber(cpf.saBalance);
+    const ma = asNumber(cpf.maBalance);
+    const cpfTotal = oa + sa + ma;
+    rows.push(['CPF OA', formatCurrency(oa), 'Included']);
+    rows.push(['CPF SA', formatCurrency(sa), 'Included']);
+    rows.push(['CPF MA', formatCurrency(ma), 'Included']);
+    rows.push(['Total CPF', formatCurrency(cpfTotal), 'CPF balances entered']);
+    total += cpfTotal;
+  }
+
+  if (srs.enabled && asNumber(srs.currentBalance) > 0) {
+    const srsValue = asNumber(srs.currentBalance);
+    rows.push(['SRS', formatCurrency(srsValue), 'Included']);
+    total += srsValue;
+  }
+
+  policies.forEach((policy) => {
+    const value = asNumber(policy.currentValue);
+    rows.push([policy.name || 'Policy', formatCurrency(value), 'Policy value']);
+    total += value;
+  });
+
+  const totalPolicyValue = policies.reduce((sum, policy) => sum + asNumber(policy.currentValue), 0);
+  if (policies.length > 0) rows.push(['Total current policy value', formatCurrency(totalPolicyValue), 'Policy values entered']);
+
+  investments.forEach((investment) => {
+    const value = asNumber(investment.currentValue);
+    rows.push([investment.name || 'Investment', formatCurrency(value), 'Investment value']);
+    total += value;
+  });
+
+  const totalInvestmentValue = investments.reduce((sum, investment) => sum + asNumber(investment.currentValue), 0);
+  if (investments.length > 0) rows.push(['Total current investment value', formatCurrency(totalInvestmentValue), 'Investment values entered']);
+
+  const cashValue = asNumber(cash.currentSavings);
+  if (cashValue > 0 || isCashIncludedInProjection(cash)) {
+    rows.push([
+      'Cash / Savings',
+      formatCurrency(cashValue),
+      isCashIncludedInProjection(cash) ? 'Included' : 'Excluded from retirement projection',
+    ]);
+    total += cashValue;
+  }
+
+  rows.push(['Total Current Assets Today', formatCurrency(total), 'Current values entered']);
+  return { rows, total };
 }
 
 function buildSrsSummary(profile, srs) {

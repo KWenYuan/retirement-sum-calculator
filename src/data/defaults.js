@@ -28,15 +28,16 @@ export const defaultCpf = {
   monthlyContribution: 1800,
   annualInterest: 4,
   includeInTotal: true,
+  cpfRulesVersion: cpfRules.version,
   frsAmountAt55: 230000,
   brsGrowthRateAfterLastKnownYear: cpfRules.brsGrowthRateAfterLastKnownYear,
-  retirementSumType: 'FRS',
+  retirementSumType: cpfRules.defaultRetirementSumType,
   useManualRetirementSumAmount: false,
   manualRetirementSumAmount: 230000,
-  minimumWithdrawalIfBelowFRS: cpfRules.defaultWithdrawalAt55IfBelowFRS,
+  minimumWithdrawalIfBelowFRS: cpfRules.defaultWithdrawalAt55IfBelowRetirementSum,
   includeCpf55WithdrawableInTimeline: true,
-  cpfLifePayoutStartAge: cpfRules.defaultCpfLifeStartAge,
-  cpfLifeMonthlyPayout: 1800,
+  cpfLifePayoutStartAge: 65,
+  cpfLifeMonthlyPayout: 0,
 };
 
 export const defaultSrs = {

@@ -77,10 +77,7 @@ export const getCpfRetirementSums = (cpf = {}, profile = {}, currentYear = new D
     .sort(([a], [b]) => a - b);
   const exactKnown = cpfRules.knownBrsByYearTurning55[yearTurning55];
   const latestKnown = knownEntries[knownEntries.length - 1] || [yearTurning55, 0];
-  const growthRate = decimalRate(
-    cpf.brsGrowthRateAfterLastKnownYear,
-    cpfRules.brsGrowthRateAfterLastKnownYear,
-  );
+  const growthRate = decimalRate(cpfRules.brsGrowthRateAfterLastKnownYear, cpfRules.brsGrowthRateAfterLastKnownYear);
   const brs = typeof exactKnown !== 'undefined'
     ? asNumber(exactKnown)
     : latestKnown[1] * ((1 + growthRate) ** Math.max(0, yearTurning55 - latestKnown[0]));
@@ -104,7 +101,7 @@ export const getSelectedCpfRetirementSum = (cpf = {}, profile = {}) => {
   const manualAmount = asNumber(cpf.manualRetirementSumAmount ?? cpf.frsAmountAt55);
   const type = cpf.useManualRetirementSumAmount || cpf.retirementSumType === 'Manual'
     ? 'Manual'
-    : (cpf.retirementSumType || 'FRS');
+    : (cpf.retirementSumType || cpfRules.defaultRetirementSumType);
   const amountByType = {
     BRS: sums.brs,
     FRS: sums.frs,
@@ -122,10 +119,12 @@ export const getSelectedCpfRetirementSum = (cpf = {}, profile = {}) => {
 
 export const calculateCpfAge55Transfer = (cpf = {}, profile = {}) => {
   if (!hasCpfFrsMilestoneData(cpf)) return null;
-  const oaSa = projectCpfOaSa(cpf, profile.currentAge, 55);
+  const projectedOa = projectCpfAccount(cpf.oaBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.oa, cpfRules.cpfOaInterestRate, profile.currentAge, 55);
+  const projectedSa = projectCpfAccount(cpf.saBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.sa, cpfRules.cpfSaInterestRate, profile.currentAge, 55);
+  const oaSa = projectedOa + projectedSa;
   const selected = getSelectedCpfRetirementSum(cpf, profile);
   const retirementSumAmount = selected.selectedRetirementSumAmount;
-  const minimumWithdrawal = asNumber(cpf.minimumWithdrawalIfBelowFRS ?? cpfRules.defaultWithdrawalAt55IfBelowFRS);
+  const minimumWithdrawal = cpfRules.defaultWithdrawalAt55IfBelowRetirementSum;
   const hasMetRetirementSum = oaSa >= retirementSumAmount;
   const withdrawableAmount = hasMetRetirementSum
     ? Math.max(0, oaSa - retirementSumAmount)
@@ -138,6 +137,8 @@ export const calculateCpfAge55Transfer = (cpf = {}, profile = {}) => {
 
   return {
     ...selected,
+    projectedOa,
+    projectedSa,
     projectedOaSa: oaSa,
     retirementSumAmount,
     raSetAside,
@@ -149,18 +150,28 @@ export const calculateCpfAge55Transfer = (cpf = {}, profile = {}) => {
   };
 };
 
+const projectCpfAccount = (balance, monthlyContribution, allocation, annualRateDecimal, currentAge, targetAge) => {
+  const years = Math.max(0, asNumber(targetAge) - asNumber(currentAge));
+  return futureValueWithMonthlyContributions(
+    balance,
+    asNumber(monthlyContribution) * asNumber(allocation),
+    annualRateDecimal * 100,
+    years,
+  );
+};
+
 export const getEffectiveRate = (itemRate, useScenarioReturn, scenarioRate) => (
   useScenarioReturn ? scenarioRate : asNumber(itemRate)
 );
 
 export const projectCpf = (cpf, years) => {
   if (!hasCpfProjectionData(cpf)) return 0;
-  const currentBalance = asNumber(cpf.oaBalance) + asNumber(cpf.saBalance) + asNumber(cpf.maBalance);
-  return futureValueWithMonthlyContributions(
-    currentBalance,
-    cpf.monthlyContribution,
-    cpf.annualInterest,
-    years,
+  const currentAge = 0;
+  const targetAge = years;
+  return (
+    projectCpfAccount(cpf.oaBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.oa, cpfRules.cpfOaInterestRate, currentAge, targetAge) +
+    projectCpfAccount(cpf.saBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.sa, cpfRules.cpfSaInterestRate, currentAge, targetAge) +
+    projectCpfAccount(cpf.maBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.ma, cpfRules.cpfMaInterestRate, currentAge, targetAge)
   );
 };
 
@@ -168,34 +179,22 @@ export const projectCpfAtAge = (cpf, currentAge, targetAge) => {
   if (!hasCpfProjectionData(cpf)) return 0;
   const startAge = asNumber(currentAge);
   const endAge = asNumber(targetAge);
-  const years = Math.max(0, endAge - startAge);
-  const payoutStartAge = asNumber(cpf.cpfLifePayoutStartAge) || 65;
-  const annualPayout = asNumber(cpf.cpfLifeMonthlyPayout) * 12;
-
-  if (endAge <= payoutStartAge || annualPayout <= 0) return projectCpf(cpf, years);
-
-  const yearsToPayoutStart = Math.max(0, payoutStartAge - startAge);
-  let value = projectCpf(cpf, yearsToPayoutStart);
-  const annualRate = rate(cpf.annualInterest);
-  const drawdownYears = Math.max(0, Math.floor(endAge - payoutStartAge));
-
-  for (let year = 0; year < drawdownYears; year += 1) {
-    value = Math.max(0, value * (1 + annualRate) - annualPayout);
+  if (endAge < 55) {
+    return projectCpfAccount(cpf.oaBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.oa, cpfRules.cpfOaInterestRate, startAge, endAge) +
+      projectCpfAccount(cpf.saBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.sa, cpfRules.cpfSaInterestRate, startAge, endAge) +
+      projectCpfAccount(cpf.maBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.ma, cpfRules.cpfMaInterestRate, startAge, endAge);
   }
 
-  return value;
+  const transfer = calculateCpfAge55Transfer(cpf, { currentAge: startAge });
+  if (!transfer) return 0;
+  const yearsAfter55 = Math.max(0, endAge - 55);
+  return compoundAnnual(transfer.raSetAside, cpfRules.cpfRaInterestRate * 100, yearsAfter55);
 };
 
 export const projectCpfOaSa = (cpf, currentAge, targetAge) => {
   if (!hasCpfFrsMilestoneData(cpf)) return 0;
-  const years = Math.max(0, asNumber(targetAge) - asNumber(currentAge));
-  const currentBalance = asNumber(cpf.oaBalance) + asNumber(cpf.saBalance);
-  return futureValueWithMonthlyContributions(
-    currentBalance,
-    cpf.monthlyContribution,
-    cpf.annualInterest,
-    years,
-  );
+  return projectCpfAccount(cpf.oaBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.oa, cpfRules.cpfOaInterestRate, currentAge, targetAge) +
+    projectCpfAccount(cpf.saBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.sa, cpfRules.cpfSaInterestRate, currentAge, targetAge);
 };
 
 export const projectSrs = (srs, currentAge, targetAge) => {
@@ -349,7 +348,7 @@ export const isCashIncludedInProjection = (cash = {}) => cash.includeCashInProje
 export const calculateAtAge = ({ profile, cpf, srs, policies, investments, cash, scenarioRate, age }) => {
   const years = Math.max(0, asNumber(age) - asNumber(profile.currentAge));
   const cpfAtAge = projectCpfAtAge(cpf, profile.currentAge, age);
-  const cpfValue = hasCpfProjectionData(cpf) && cpf.includeInTotal ? cpfAtAge : 0;
+  const cpfValue = hasCpfProjectionData(cpf) ? cpfAtAge : 0;
   const visibleCpfValue = cpfAtAge;
   const srsValue = projectSrs(srs, asNumber(profile.currentAge), asNumber(age));
   const policyValue = policies.reduce(
@@ -474,8 +473,6 @@ export const buildRetirementTimeline = (state) => {
     const transfer = calculateCpfAge55Transfer(state.cpf, state.profile);
     if (
       transfer &&
-      state.cpf.includeCpf55WithdrawableInTimeline !== false &&
-      transfer.withdrawableAmount > 0 &&
       cpf55Age >= startAge &&
       cpf55Age <= endAge
     ) {
@@ -484,23 +481,9 @@ export const buildRetirementTimeline = (state) => {
         title: 'CPF Age 55 Transfer',
         amount: transfer.withdrawableAmount,
         category: 'CPF',
-        description: `Client turns 55 in ${transfer.yearTurning55}. Retirement sum type: ${transfer.retirementSumType}. Estimated BRS: ${formatCurrency(transfer.brs)}. Estimated FRS: ${formatCurrency(transfer.frs)}. Estimated ERS: ${formatCurrency(transfer.ers)}. Selected retirement sum: ${formatCurrency(transfer.retirementSumAmount)}. Projected OA + SA: ${formatCurrency(transfer.projectedOaSa)}. Estimated RA set aside: ${formatCurrency(transfer.raSetAside)}. Estimated withdrawable amount: ${formatCurrency(transfer.withdrawableAmount)}. Estimated ${transfer.shortfall > 0 ? 'shortfall' : 'excess'}: ${formatCurrency(transfer.shortfall || transfer.excess)}.`,
+        description: `Client turns 55 in ${transfer.yearTurning55}. Retirement sum type: ${transfer.retirementSumType}. Estimated BRS: ${formatCurrency(transfer.brs)}. Estimated FRS: ${formatCurrency(transfer.frs)}. Estimated ERS: ${formatCurrency(transfer.ers)}. Projected OA at 55: ${formatCurrency(transfer.projectedOa)}. Projected SA at 55: ${formatCurrency(transfer.projectedSa)}. Projected OA + SA: ${formatCurrency(transfer.projectedOaSa)}. Estimated RA set aside: ${formatCurrency(transfer.raSetAside)}. Withdrawable: ${formatCurrency(transfer.withdrawableAmount)}. Estimated ${transfer.shortfall > 0 ? 'shortfall' : 'excess'}: ${formatCurrency(transfer.shortfall || transfer.excess)}.`,
       });
     }
-  }
-
-  if (hasCpfProjectionData(state.cpf) && asNumber(state.cpf.cpfLifeMonthlyPayout) > 0) {
-    const payoutStart = asNumber(state.cpf.cpfLifePayoutStartAge) || 65;
-    addIncomeStream({
-      start: payoutStart,
-      end: endAge,
-      title: `CPF LIFE: ${formatCurrency(state.cpf.cpfLifeMonthlyPayout)}/month`,
-      category: 'CPF',
-      amountPerPeriod: state.cpf.cpfLifeMonthlyPayout,
-      frequency: 'monthly',
-      description: `From age ${payoutStart}. ${formatCurrency(state.cpf.cpfLifeMonthlyPayout)}/month. Lifetime income.`,
-      durationLabel: 'Lifetime',
-    });
   }
 
   if (state.srs.enabled) {
@@ -713,7 +696,7 @@ export const buildIncomeSources = ({ profile, age, ageDetails }) => {
 
 const getIncomeSourceName = (category = '') => {
   const normalized = category.toLowerCase();
-  if (normalized.includes('cpf')) return 'CPF LIFE';
+  if (normalized.includes('cpf')) return 'CPF';
   if (normalized.includes('srs')) return 'SRS withdrawal';
   if (normalized.includes('policy')) return 'Policy income';
   if (normalized.includes('investment')) return 'Investment withdrawal';

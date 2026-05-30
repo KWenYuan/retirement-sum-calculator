@@ -187,6 +187,7 @@ function normalizeCpfFields(cpfData, legacyCpfEnabled) {
   const merged = {
     ...defaultCpf,
     ...cpfData,
+    cpfRulesVersion: cpfData.cpfRulesVersion || defaultCpf.cpfRulesVersion,
     brsGrowthRateAfterLastKnownYear: cpfData.brsGrowthRateAfterLastKnownYear ?? defaultCpf.brsGrowthRateAfterLastKnownYear,
     retirementSumType: cpfData.retirementSumType || (cpfData.useManualRetirementSumAmount ? 'Manual' : defaultCpf.retirementSumType),
     useManualRetirementSumAmount: Boolean(cpfData.useManualRetirementSumAmount),

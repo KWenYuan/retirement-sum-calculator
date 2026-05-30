@@ -53,16 +53,6 @@ export function CpfSection({ cpf, setCpf, profile }) {
   const cpfSums = getCpfRetirementSums(cpf, profile);
   const selectedSum = getSelectedCpfRetirementSum(cpf, profile);
   const cpf55Transfer = calculateCpfAge55Transfer(cpf, profile);
-  const brsGrowthPercent = cpf.brsGrowthRateAfterLastKnownYear === ''
-    ? ''
-    : Number(cpf.brsGrowthRateAfterLastKnownYear ?? 0) * 100;
-  const updateBrsGrowthRate = (value) => {
-    if (value === '') {
-      update('brsGrowthRateAfterLastKnownYear', '');
-      return;
-    }
-    update('brsGrowthRateAfterLastKnownYear', Number(value) / 100);
-  };
   return (
     <AccordionSection title="CPF" action={<Toggle label="Enabled" checked={cpf.enabled} onChange={(value) => update('enabled', value)} />}>
       {cpf.enabled && (
@@ -73,38 +63,25 @@ export function CpfSection({ cpf, setCpf, profile }) {
             <NumberField label="CPF MA" prefix="$" value={cpf.maBalance} onChange={(value) => update('maBalance', value)} />
             <NumberField label="Monthly CPF contribution" prefix="$" value={cpf.monthlyContribution} onChange={(value) => update('monthlyContribution', value)} />
           </div>
-          <details className="advanced-block">
-            <summary>Advanced CPF assumptions</summary>
-            <div className="form-grid compact input-compact-grid">
-              <NumberField label="CPF annual interest" suffix="%" step={0.1} value={cpf.annualInterest} onChange={(value) => update('annualInterest', value)} />
-              <SelectField label="Retirement sum type" value={cpf.useManualRetirementSumAmount ? 'Manual' : (cpf.retirementSumType || 'FRS')} onChange={(value) => {
-                update('retirementSumType', value);
-                update('useManualRetirementSumAmount', value === 'Manual');
-              }} options={['BRS', 'FRS', 'ERS', 'Manual']} />
-              <Toggle label="Use manual retirement sum amount" checked={Boolean(cpf.useManualRetirementSumAmount)} onChange={(value) => update('useManualRetirementSumAmount', value)} />
-              {cpf.useManualRetirementSumAmount && (
-                <NumberField label="Manual retirement sum amount" prefix="$" value={cpf.manualRetirementSumAmount ?? cpf.frsAmountAt55} onChange={(value) => {
-                  update('manualRetirementSumAmount', value);
-                  update('frsAmountAt55', value);
-                }} />
-              )}
-              <NumberField label="Future BRS growth rate after last official year" suffix="%" step={0.1} value={brsGrowthPercent} onChange={updateBrsGrowthRate} />
-              <NumberField label="Minimum withdrawal if below selected sum" prefix="$" value={cpf.minimumWithdrawalIfBelowFRS} onChange={(value) => update('minimumWithdrawalIfBelowFRS', value)} />
-              <NumberField label="CPF LIFE payout age" value={cpf.cpfLifePayoutStartAge} onChange={(value) => update('cpfLifePayoutStartAge', value)} />
-              <NumberField label="CPF LIFE monthly payout" prefix="$" value={cpf.cpfLifeMonthlyPayout} onChange={(value) => update('cpfLifeMonthlyPayout', value)} />
-              <Toggle label="Include CPF in retirement total" checked={cpf.includeInTotal} onChange={(value) => update('includeInTotal', value)} />
-              <Toggle label="Show CPF 55 withdrawable in timeline" checked={cpf.includeCpf55WithdrawableInTimeline !== false} onChange={(value) => update('includeCpf55WithdrawableInTimeline', value)} />
-            </div>
-            <p className="field-helper">Used to estimate future BRS for clients who turn 55 after the latest official CPF retirement sum table.</p>
-            <div className="policy-derived-panel cpf-sum-panel">
-              <span>Client turns 55 in: <strong>{cpfSums.yearTurning55}</strong></span>
-              <span>Estimated BRS: <strong>{formatCurrency(cpfSums.brs)}</strong></span>
-              <span>Estimated FRS: <strong>{formatCurrency(cpfSums.frs)}</strong></span>
-              <span>Estimated ERS: <strong>{formatCurrency(cpfSums.ers)}</strong></span>
-              <span>Selected retirement sum: <strong>{formatCurrency(selectedSum.selectedRetirementSumAmount)}</strong></span>
-              {cpf55Transfer && <span>Estimated withdrawable at 55: <strong>{formatCurrency(cpf55Transfer.withdrawableAmount)}</strong></span>}
-            </div>
-          </details>
+          <div className="policy-derived-panel cpf-sum-panel">
+            <span>Client turns 55 in: <strong>{cpfSums.yearTurning55}</strong></span>
+            <span>Estimated BRS: <strong>{formatCurrency(cpfSums.brs)}</strong></span>
+            <span>Estimated FRS: <strong>{formatCurrency(cpfSums.frs)}</strong></span>
+            <span>Estimated ERS: <strong>{formatCurrency(cpfSums.ers)}</strong></span>
+            <span>Selected retirement sum assumption: <strong>{selectedSum.retirementSumType}</strong></span>
+            <span>Selected retirement sum amount: <strong>{formatCurrency(selectedSum.selectedRetirementSumAmount)}</strong></span>
+            {cpf55Transfer && (
+              <>
+                <span>Projected OA at 55: <strong>{formatCurrency(cpf55Transfer.projectedOa)}</strong></span>
+                <span>Projected SA at 55: <strong>{formatCurrency(cpf55Transfer.projectedSa)}</strong></span>
+                <span>Projected OA + SA at 55: <strong>{formatCurrency(cpf55Transfer.projectedOaSa)}</strong></span>
+                <span>Estimated RA set aside: <strong>{formatCurrency(cpf55Transfer.raSetAside)}</strong></span>
+                <span>Estimated withdrawable at 55: <strong>{formatCurrency(cpf55Transfer.withdrawableAmount)}</strong></span>
+                <span>Estimated {cpf55Transfer.shortfall > 0 ? 'shortfall' : 'excess'}: <strong>{formatCurrency(cpf55Transfer.shortfall || cpf55Transfer.excess)}</strong></span>
+              </>
+            )}
+          </div>
+          <p className="field-helper">CPF assumptions are managed in <code>cpfRules.js</code>.</p>
         </>
       )}
     </AccordionSection>

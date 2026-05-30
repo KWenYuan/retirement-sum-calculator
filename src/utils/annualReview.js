@@ -98,7 +98,6 @@ export function buildChangedSinceLastReview(previousReviewData, currentState, co
   addTextChange(changes, 'CPF', 'Retirement sum type', previous.cpf.retirementSumType, currentState.cpf.retirementSumType);
   addNumberChange(changes, 'CPF', 'Future BRS growth assumption', previous.cpf.brsGrowthRateAfterLastKnownYear, currentState.cpf.brsGrowthRateAfterLastKnownYear, 'decimal-percent');
   addNumberChange(changes, 'CPF', 'Manual retirement sum amount', previous.cpf.manualRetirementSumAmount, currentState.cpf.manualRetirementSumAmount, 'currency');
-  addNumberChange(changes, 'CPF', 'CPF LIFE payout assumption', previous.cpf.cpfLifeMonthlyPayout, currentState.cpf.cpfLifeMonthlyPayout, 'currency');
 
   addNumberChange(changes, 'SRS', 'SRS balance', previous.srs.currentBalance, currentState.srs.currentBalance, 'currency');
   addNumberChange(changes, 'SRS', 'Annual SRS contribution', previous.srs.annualContribution, currentState.srs.annualContribution, 'currency');

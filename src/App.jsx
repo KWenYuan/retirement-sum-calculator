@@ -44,6 +44,7 @@ import {
   buildIncomeSources,
   buildRetirementTimeline,
   buildTimeline,
+  calculateCpfAge55Transfer,
   calculatePayoutSummary,
   calculateAtAge,
   calculateNeeds,
@@ -555,6 +556,7 @@ function SummaryMini({ label, value }) {
 
 function KeyTakeaways({ profile, retirementPoint, incomeSources, needs, cpf }) {
   const gapLabel = needs.surplusShortfall >= 0 ? 'estimated surplus' : 'estimated shortfall';
+  const cpfTransfer = calculateCpfAge55Transfer(cpf, profile);
   const planningOpportunity = needs.surplusShortfall >= 0
     ? 'The plan is currently ahead of the illustrated retirement need based on the assumptions shown.'
     : 'The main planning opportunity is to close the retirement income gap with additional savings, investments, or adjusted assumptions.';
@@ -562,9 +564,9 @@ function KeyTakeaways({ profile, retirementPoint, incomeSources, needs, cpf }) {
   const takeaways = [
     `Your projected retirement assets are ${formatCurrency(retirementPoint.total)} by age ${profile.retirementAge}.`,
     `Your projected monthly income at the selected age is ${formatCurrency(incomeSources.totalMonthlyIncome)}/month.`,
-    hasCpfProjectionData(cpf) && Number(cpf.cpfLifeMonthlyPayout) > 0
-      ? `CPF LIFE contributes ${formatCurrency(cpf.cpfLifeMonthlyPayout)}/month from age ${cpf.cpfLifePayoutStartAge}.`
-      : 'CPF LIFE has not been included in this illustration.',
+    hasCpfProjectionData(cpf) && cpfTransfer
+      ? `CPF age 55 estimated withdrawable amount is ${formatCurrency(cpfTransfer.withdrawableAmount)}, with ${formatCurrency(cpfTransfer.raSetAside)} set aside in RA.`
+      : 'CPF has not been included in this illustration.',
     `The current projection shows an ${gapLabel} of ${formatCurrency(Math.abs(needs.surplusShortfall))}.`,
     planningOpportunity,
   ];

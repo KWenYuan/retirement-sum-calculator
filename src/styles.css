@@ -2340,6 +2340,20 @@ textarea:focus {
   margin-bottom: 14px;
 }
 
+.export-cover-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px;
+  align-items: start;
+  gap: 16px;
+}
+
+.export-logo {
+  justify-self: end;
+  max-width: 110px;
+  max-height: 62px;
+  object-fit: contain;
+}
+
 .export-cover p {
   margin: 0 0 5px;
   color: var(--gold);
@@ -2357,8 +2371,9 @@ textarea:focus {
 }
 
 .export-meta {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  justify-content: start;
   gap: 12px;
   margin-top: 10px;
   color: #475467;
@@ -2455,6 +2470,12 @@ textarea:focus {
 
 .export-table tbody tr:nth-child(even) td {
   background: #f7f9fc;
+}
+
+.export-table .export-total-row td {
+  color: var(--navy);
+  background: #f4ecd8;
+  font-weight: 900;
 }
 
 .export-timeline-visual {

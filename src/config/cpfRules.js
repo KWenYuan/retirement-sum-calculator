@@ -1,6 +1,15 @@
 export const cpfRules = {
-  defaultWithdrawalAt55IfBelowFRS: 5000,
-  defaultCpfLifeStartAge: 65,
+  version: '2026-01',
+  cpfOaInterestRate: 0.025,
+  cpfSaInterestRate: 0.04,
+  cpfMaInterestRate: 0.04,
+  cpfRaInterestRate: 0.04,
+  monthlyContributionAllocation: {
+    oa: 0.6,
+    sa: 0.25,
+    ma: 0.15,
+  },
+  defaultWithdrawalAt55IfBelowRetirementSum: 5000,
   brsGrowthRateAfterLastKnownYear: 0.035,
   knownBrsByYearTurning55: {
     2025: 106500,
@@ -9,4 +18,5 @@ export const cpfRules = {
   },
   ersMultiplierFrom2025: 4,
   frsMultiplier: 2,
+  defaultRetirementSumType: 'FRS',
 };
