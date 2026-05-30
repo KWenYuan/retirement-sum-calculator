@@ -95,7 +95,9 @@ export function buildChangedSinceLastReview(previousReviewData, currentState, co
   addNumberChange(changes, 'CPF', 'CPF SA balance', previous.cpf.saBalance, currentState.cpf.saBalance, 'currency');
   addNumberChange(changes, 'CPF', 'CPF MA balance', previous.cpf.maBalance, currentState.cpf.maBalance, 'currency');
   addNumberChange(changes, 'CPF', 'CPF contribution', previous.cpf.monthlyContribution, currentState.cpf.monthlyContribution, 'currency');
-  addNumberChange(changes, 'CPF', 'FRS assumption', previous.cpf.frsAmountAt55, currentState.cpf.frsAmountAt55, 'currency');
+  addTextChange(changes, 'CPF', 'Retirement sum type', previous.cpf.retirementSumType, currentState.cpf.retirementSumType);
+  addNumberChange(changes, 'CPF', 'Future BRS growth assumption', previous.cpf.brsGrowthRateAfterLastKnownYear, currentState.cpf.brsGrowthRateAfterLastKnownYear, 'decimal-percent');
+  addNumberChange(changes, 'CPF', 'Manual retirement sum amount', previous.cpf.manualRetirementSumAmount, currentState.cpf.manualRetirementSumAmount, 'currency');
   addNumberChange(changes, 'CPF', 'CPF LIFE payout assumption', previous.cpf.cpfLifeMonthlyPayout, currentState.cpf.cpfLifeMonthlyPayout, 'currency');
 
   addNumberChange(changes, 'SRS', 'SRS balance', previous.srs.currentBalance, currentState.srs.currentBalance, 'currency');
@@ -188,6 +190,7 @@ function formatValue(value, type) {
   if (type === 'currency') return currency(value);
   if (type === 'currency-month') return `${currency(value)}/month`;
   if (type === 'percent') return `${asNumber(value)}%`;
+  if (type === 'decimal-percent') return `${(asNumber(value) * 100).toFixed(2).replace(/\.?0+$/, '')}%`;
   if (type === 'years') return `${asNumber(value)} years`;
   return `${asNumber(value)}`;
 }

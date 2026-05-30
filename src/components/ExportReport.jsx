@@ -1,8 +1,10 @@
 import {
+  calculateCpfAge55Transfer,
   formatCurrency,
   getPolicyStructure,
+  hasCpfFrsMilestoneData,
+  hasCpfProjectionData,
   projectCash,
-  projectCpfOaSa,
   projectInvestment,
   projectPolicy,
   projectSrs,
@@ -35,8 +37,11 @@ export function ExportReport({
   exportDate,
 }) {
   const includeCash = isCashIncludedInProjection(cash);
+  const includeCpf = hasCpfProjectionData(cpf);
+  const includeCpf55 = hasCpfFrsMilestoneData(cpf);
+  const includeCpfLife = includeCpf && asNumber(cpf.cpfLifeMonthlyPayout) > 0;
   const assetBreakdown = [
-    ['CPF', retirementPoint.cpf],
+    ...(includeCpf ? [['CPF', retirementPoint.cpf]] : []),
     ['SRS', retirementPoint.srs],
     ['Investment policies', retirementPoint.policies],
     ['Personal investments', retirementPoint.investments],
@@ -47,7 +52,7 @@ export function ExportReport({
     retirementTimeline,
   });
   const timelineVisualRows = timelineRows.slice(0, 8);
-  const cpf55 = buildCpf55Summary(profile, cpf);
+  const cpf55 = includeCpf55 ? calculateCpfAge55Transfer(cpf, profile) : null;
   const srsSummary = buildSrsSummary(profile, srs);
   const personalInvestmentRows = investments.map((investment) => {
     const withdrawalAge = asNumber(investment.plannedWithdrawalAge) || asNumber(profile.retirementAge);
@@ -125,25 +130,36 @@ export function ExportReport({
         />
       </section>
 
-      <section className="export-section avoid-break">
-        <h2>CPF 55 Milestone</h2>
-        <SimpleTable
-          headers={['Item', 'Estimate']}
-          rows={[
-            ['Projected OA + SA at age 55', formatCurrency(cpf55.oaSa)],
-            ['FRS amount set aside', formatCurrency(cpf55.frs)],
-            [cpf55.excess >= 0 ? 'Estimated excess withdrawable' : 'Estimated FRS shortfall', formatCurrency(Math.abs(cpf55.excess))],
-          ]}
-        />
-      </section>
+      {includeCpf55 && (
+        <section className="export-section avoid-break">
+          <h2>CPF Age 55 Transfer</h2>
+          <SimpleTable
+            headers={['Item', 'Estimate']}
+            rows={[
+              ['Client turns 55 in', cpf55.yearTurning55],
+              ['Retirement sum type used', cpf55.retirementSumType],
+              ['Estimated BRS', formatCurrency(cpf55.brs)],
+              ['Estimated FRS', formatCurrency(cpf55.frs)],
+              ['Estimated ERS', formatCurrency(cpf55.ers)],
+              ['Selected retirement sum amount', formatCurrency(cpf55.retirementSumAmount)],
+              ['Projected OA + SA at age 55', formatCurrency(cpf55.projectedOaSa)],
+              ['Estimated RA set aside', formatCurrency(cpf55.raSetAside)],
+              ['Estimated withdrawable amount', formatCurrency(cpf55.withdrawableAmount)],
+              [cpf55.shortfall > 0 ? 'Estimated shortfall' : 'Estimated excess', formatCurrency(cpf55.shortfall || cpf55.excess)],
+            ]}
+          />
+        </section>
+      )}
 
-      <section className="export-section avoid-break">
-        <h2>CPF LIFE Income</h2>
-        <SimpleTable
-          headers={['Start age', 'Estimated monthly payout']}
-          rows={[[cpf.cpfLifePayoutStartAge, formatCurrency(cpf.cpfLifeMonthlyPayout)]]}
-        />
-      </section>
+      {includeCpfLife && (
+        <section className="export-section avoid-break">
+          <h2>CPF LIFE Income</h2>
+          <SimpleTable
+            headers={['Start age', 'Estimated monthly payout']}
+            rows={[[cpf.cpfLifePayoutStartAge, formatCurrency(cpf.cpfLifeMonthlyPayout)]]}
+          />
+        </section>
+      )}
 
       {srs.enabled && (
         <section className="export-section avoid-break">
@@ -329,16 +345,6 @@ function SimpleTable({ headers, rows, emptyMessage = 'No records entered.' }) {
       </tbody>
     </table>
   );
-}
-
-function buildCpf55Summary(profile, cpf) {
-  const oaSa = projectCpfOaSa(cpf, profile.currentAge, 55);
-  const frs = asNumber(cpf.frsAmountAt55);
-  return {
-    oaSa,
-    frs,
-    excess: oaSa - frs,
-  };
 }
 
 function buildSrsSummary(profile, srs) {

@@ -1,7 +1,7 @@
 import { CalendarClock, CircleDollarSign } from 'lucide-react';
 import { calculatePayoutSummary, formatCurrency } from '../utils/projections.js';
 
-const timelineNote = 'CPF projections, FRS amounts, CPF LIFE payouts, policy values, withdrawals and investment returns are simplified estimates for illustration only. Actual values depend on CPF rules, policy terms, market returns, fees, withdrawals, taxation and prevailing regulations.';
+const timelineNote = 'CPF projections, retirement sums, CPF LIFE payouts, policy values, withdrawals and investment returns are simplified estimates for illustration only. Future CPF retirement sums are estimated using an advisor-entered BRS growth assumption. Actual CPF BRS, FRS, ERS, CPF LIFE payouts, CPF rules, policy terms, market returns, fees, withdrawals, taxation and prevailing regulations may differ.';
 
 export function RetirementTimeline({
   timeline,
@@ -22,6 +22,7 @@ export function RetirementTimeline({
   );
   const showCashLegend = hasCashTimelineItems(timeline);
   const showSrsLegend = hasSrsTimelineItems(timeline);
+  const showCpfLegend = hasCpfTimelineItems(timeline);
   const topLaneCount = Math.max(1, topStreamRows.length);
   const bottomLaneCount = Math.max(1, bottomStreamRows.length);
   const payoutSummary = calculatePayoutSummary(ageDetails);
@@ -34,7 +35,7 @@ export function RetirementTimeline({
           <p className="section-subtext">One line showing lump sums, income starts, and important retirement ages.</p>
         </div>
         <div className="timeline-header-tools">
-          <TimelineLegend showCash={showCashLegend} showSrs={showSrsLegend} />
+          <TimelineLegend showCash={showCashLegend} showSrs={showSrsLegend} showCpf={showCpfLegend} />
           <div className="timeline-selected-age">
             <div className="selected-age-copy">
               <span>Selected age</span>
@@ -249,12 +250,12 @@ function StreamBar({ stream, placement, rowIndex, rowCount, setSelectedAge }) {
   );
 }
 
-function TimelineLegend({ showCash, showSrs }) {
+function TimelineLegend({ showCash, showSrs, showCpf }) {
   return (
     <div className="timeline-legend" aria-label="Timeline legend">
       <span><i className="legend-dot legend-lump" /> Lump Sum</span>
       <span><i className="legend-line legend-income" /> Income Stream</span>
-      <span><i className="legend-dot category-cpf" /> CPF</span>
+      {showCpf && <span><i className="legend-dot category-cpf" /> CPF</span>}
       {showSrs && <span><i className="legend-dot category-srs" /> SRS</span>}
       <span><i className="legend-dot category-policy" /> Policy</span>
       <span><i className="legend-dot category-investment" /> Investment</span>
@@ -286,6 +287,11 @@ function isUpperStream(stream) {
 function hasCashTimelineItems(timeline) {
   return [...(timeline.milestones || []), ...(timeline.incomeStreams || [])]
     .some((item) => (item.category || '').toLowerCase().includes('cash'));
+}
+
+function hasCpfTimelineItems(timeline) {
+  return [...(timeline.milestones || []), ...(timeline.incomeStreams || [])]
+    .some((item) => (item.category || '').toLowerCase().includes('cpf'));
 }
 
 function hasSrsTimelineItems(timeline) {

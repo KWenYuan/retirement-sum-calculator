@@ -1,9 +1,17 @@
+import { cpfRules } from '../config/cpfRules.js';
+
 const asNumber = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
 const rate = (percent) => asNumber(percent) / 100;
+
+const decimalRate = (value, fallback = 0) => {
+  const parsed = asNumber(value);
+  if (parsed === 0) return fallback;
+  return Math.abs(parsed) > 1 ? parsed / 100 : parsed;
+};
 
 const compoundAnnual = (principal, annualRate, years) => {
   if (years <= 0) return asNumber(principal);
@@ -39,12 +47,114 @@ const futureValueWithMonthlyContributions = (currentValue, monthlyContribution, 
   monthlyContributionFutureValue(monthlyContribution, annualRate, years)
 );
 
+export const hasCpfProjectionData = (cpf = {}) => (
+  Boolean(cpf.enabled) &&
+  (
+    asNumber(cpf.oaBalance) > 0 ||
+    asNumber(cpf.saBalance) > 0 ||
+    asNumber(cpf.maBalance) > 0 ||
+    asNumber(cpf.monthlyContribution) > 0
+  )
+);
+
+export const hasCpfFrsMilestoneData = (cpf = {}) => (
+  Boolean(cpf.enabled) &&
+  (
+    asNumber(cpf.oaBalance) > 0 ||
+    asNumber(cpf.saBalance) > 0 ||
+    asNumber(cpf.monthlyContribution) > 0
+  )
+);
+
+export const getCpfYearTurning55 = (profile = {}, currentYear = new Date().getFullYear()) => (
+  asNumber(currentYear) + Math.max(0, 55 - asNumber(profile.currentAge))
+);
+
+export const getCpfRetirementSums = (cpf = {}, profile = {}, currentYear = new Date().getFullYear()) => {
+  const yearTurning55 = getCpfYearTurning55(profile, currentYear);
+  const knownEntries = Object.entries(cpfRules.knownBrsByYearTurning55)
+    .map(([year, brs]) => [Number(year), asNumber(brs)])
+    .sort(([a], [b]) => a - b);
+  const exactKnown = cpfRules.knownBrsByYearTurning55[yearTurning55];
+  const latestKnown = knownEntries[knownEntries.length - 1] || [yearTurning55, 0];
+  const growthRate = decimalRate(
+    cpf.brsGrowthRateAfterLastKnownYear,
+    cpfRules.brsGrowthRateAfterLastKnownYear,
+  );
+  const brs = typeof exactKnown !== 'undefined'
+    ? asNumber(exactKnown)
+    : latestKnown[1] * ((1 + growthRate) ** Math.max(0, yearTurning55 - latestKnown[0]));
+  const frs = brs * cpfRules.frsMultiplier;
+  const ers = brs * cpfRules.ersMultiplierFrom2025;
+
+  return {
+    yearTurning55,
+    brs,
+    frs,
+    ers,
+    growthRate,
+    source: typeof exactKnown !== 'undefined' ? 'official' : 'projected',
+    latestKnownYear: latestKnown[0],
+    latestKnownBrs: latestKnown[1],
+  };
+};
+
+export const getSelectedCpfRetirementSum = (cpf = {}, profile = {}) => {
+  const sums = getCpfRetirementSums(cpf, profile);
+  const manualAmount = asNumber(cpf.manualRetirementSumAmount ?? cpf.frsAmountAt55);
+  const type = cpf.useManualRetirementSumAmount || cpf.retirementSumType === 'Manual'
+    ? 'Manual'
+    : (cpf.retirementSumType || 'FRS');
+  const amountByType = {
+    BRS: sums.brs,
+    FRS: sums.frs,
+    ERS: sums.ers,
+    Manual: manualAmount,
+  };
+
+  return {
+    ...sums,
+    retirementSumType: type,
+    selectedRetirementSumAmount: amountByType[type] ?? sums.frs,
+    manualRetirementSumAmount: manualAmount,
+  };
+};
+
+export const calculateCpfAge55Transfer = (cpf = {}, profile = {}) => {
+  if (!hasCpfFrsMilestoneData(cpf)) return null;
+  const oaSa = projectCpfOaSa(cpf, profile.currentAge, 55);
+  const selected = getSelectedCpfRetirementSum(cpf, profile);
+  const retirementSumAmount = selected.selectedRetirementSumAmount;
+  const minimumWithdrawal = asNumber(cpf.minimumWithdrawalIfBelowFRS ?? cpfRules.defaultWithdrawalAt55IfBelowFRS);
+  const hasMetRetirementSum = oaSa >= retirementSumAmount;
+  const withdrawableAmount = hasMetRetirementSum
+    ? Math.max(0, oaSa - retirementSumAmount)
+    : Math.min(minimumWithdrawal, Math.max(0, oaSa));
+  const raSetAside = hasMetRetirementSum
+    ? retirementSumAmount
+    : Math.max(0, oaSa - withdrawableAmount);
+  const shortfall = Math.max(0, retirementSumAmount - oaSa);
+  const excess = Math.max(0, oaSa - retirementSumAmount);
+
+  return {
+    ...selected,
+    projectedOaSa: oaSa,
+    retirementSumAmount,
+    raSetAside,
+    withdrawableAmount,
+    shortfall,
+    excess,
+    minimumWithdrawal,
+    hasMetRetirementSum,
+  };
+};
+
 export const getEffectiveRate = (itemRate, useScenarioReturn, scenarioRate) => (
   useScenarioReturn ? scenarioRate : asNumber(itemRate)
 );
 
 export const projectCpf = (cpf, years) => {
-  if (!cpf.enabled) return 0;
+  if (!hasCpfProjectionData(cpf)) return 0;
   const currentBalance = asNumber(cpf.oaBalance) + asNumber(cpf.saBalance) + asNumber(cpf.maBalance);
   return futureValueWithMonthlyContributions(
     currentBalance,
@@ -55,7 +165,7 @@ export const projectCpf = (cpf, years) => {
 };
 
 export const projectCpfAtAge = (cpf, currentAge, targetAge) => {
-  if (!cpf.enabled) return 0;
+  if (!hasCpfProjectionData(cpf)) return 0;
   const startAge = asNumber(currentAge);
   const endAge = asNumber(targetAge);
   const years = Math.max(0, endAge - startAge);
@@ -77,7 +187,7 @@ export const projectCpfAtAge = (cpf, currentAge, targetAge) => {
 };
 
 export const projectCpfOaSa = (cpf, currentAge, targetAge) => {
-  if (!cpf.enabled) return 0;
+  if (!hasCpfFrsMilestoneData(cpf)) return 0;
   const years = Math.max(0, asNumber(targetAge) - asNumber(currentAge));
   const currentBalance = asNumber(cpf.oaBalance) + asNumber(cpf.saBalance);
   return futureValueWithMonthlyContributions(
@@ -239,7 +349,7 @@ export const isCashIncludedInProjection = (cash = {}) => cash.includeCashInProje
 export const calculateAtAge = ({ profile, cpf, srs, policies, investments, cash, scenarioRate, age }) => {
   const years = Math.max(0, asNumber(age) - asNumber(profile.currentAge));
   const cpfAtAge = projectCpfAtAge(cpf, profile.currentAge, age);
-  const cpfValue = cpf.includeInTotal ? cpfAtAge : 0;
+  const cpfValue = hasCpfProjectionData(cpf) && cpf.includeInTotal ? cpfAtAge : 0;
   const visibleCpfValue = cpfAtAge;
   const srsValue = projectSrs(srs, asNumber(profile.currentAge), asNumber(age));
   const policyValue = policies.reduce(
@@ -359,21 +469,27 @@ export const buildRetirementTimeline = (state) => {
     });
   });
 
-  if (state.cpf.enabled) {
+  if (hasCpfFrsMilestoneData(state.cpf)) {
     const cpf55Age = 55;
-    const cpfOaSaAt55 = projectCpfOaSa(state.cpf, startAge, cpf55Age);
-    const frs = asNumber(state.cpf.frsAmountAt55);
-    const excess = cpfOaSaAt55 - frs;
-    if (cpf55Age >= startAge && cpf55Age <= endAge) {
+    const transfer = calculateCpfAge55Transfer(state.cpf, state.profile);
+    if (
+      transfer &&
+      state.cpf.includeCpf55WithdrawableInTimeline !== false &&
+      transfer.withdrawableAmount > 0 &&
+      cpf55Age >= startAge &&
+      cpf55Age <= endAge
+    ) {
       addLumpSum({
         age: cpf55Age,
-        title: 'CPF 55 milestone',
-        amount: Math.abs(excess),
+        title: 'CPF Age 55 Transfer',
+        amount: transfer.withdrawableAmount,
         category: 'CPF',
-        description: `Projected OA + SA: ${formatCurrency(cpfOaSaAt55)}. FRS set aside: ${formatCurrency(frs)}. ${excess >= 0 ? 'Estimated excess withdrawable' : 'Estimated FRS shortfall'}: ${formatCurrency(Math.abs(excess))}.`,
+        description: `Client turns 55 in ${transfer.yearTurning55}. Retirement sum type: ${transfer.retirementSumType}. Estimated BRS: ${formatCurrency(transfer.brs)}. Estimated FRS: ${formatCurrency(transfer.frs)}. Estimated ERS: ${formatCurrency(transfer.ers)}. Selected retirement sum: ${formatCurrency(transfer.retirementSumAmount)}. Projected OA + SA: ${formatCurrency(transfer.projectedOaSa)}. Estimated RA set aside: ${formatCurrency(transfer.raSetAside)}. Estimated withdrawable amount: ${formatCurrency(transfer.withdrawableAmount)}. Estimated ${transfer.shortfall > 0 ? 'shortfall' : 'excess'}: ${formatCurrency(transfer.shortfall || transfer.excess)}.`,
       });
     }
+  }
 
+  if (hasCpfProjectionData(state.cpf) && asNumber(state.cpf.cpfLifeMonthlyPayout) > 0) {
     const payoutStart = asNumber(state.cpf.cpfLifePayoutStartAge) || 65;
     addIncomeStream({
       start: payoutStart,

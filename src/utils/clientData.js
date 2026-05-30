@@ -71,7 +71,7 @@ export function validateImportPayload(payload) {
 export function restoreCalculatorState(data = {}) {
   return {
     profile: { ...defaultProfile, ...(data.profile || {}) },
-    cpf: { ...defaultCpf, ...(data.cpf || {}) },
+    cpf: normalizeCpfFields(data.cpf, data.cpfEnabled),
     srs: { ...defaultSrs, ...(data.srs || {}) },
     policies: normalizeList(data.policies, starterPolicies),
     investments: normalizeList(data.investments, starterInvestments),
@@ -171,6 +171,43 @@ export function loadClientDataFromStorage() {
 export function clearSavedClientData() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(CLIENT_DATA_STORAGE_KEY);
+}
+
+function normalizeCpfFields(cpfData, legacyCpfEnabled) {
+  if (!cpfData) {
+    return {
+      ...defaultCpf,
+      enabled: false,
+      oaBalance: 0,
+      saBalance: 0,
+      maBalance: 0,
+      monthlyContribution: 0,
+    };
+  }
+  const merged = {
+    ...defaultCpf,
+    ...cpfData,
+    brsGrowthRateAfterLastKnownYear: cpfData.brsGrowthRateAfterLastKnownYear ?? defaultCpf.brsGrowthRateAfterLastKnownYear,
+    retirementSumType: cpfData.retirementSumType || (cpfData.useManualRetirementSumAmount ? 'Manual' : defaultCpf.retirementSumType),
+    useManualRetirementSumAmount: Boolean(cpfData.useManualRetirementSumAmount),
+    manualRetirementSumAmount: cpfData.manualRetirementSumAmount ?? cpfData.frsAmountAt55 ?? defaultCpf.manualRetirementSumAmount,
+    minimumWithdrawalIfBelowFRS: cpfData.minimumWithdrawalIfBelowFRS ?? defaultCpf.minimumWithdrawalIfBelowFRS,
+    includeCpf55WithdrawableInTimeline: cpfData.includeCpf55WithdrawableInTimeline ?? defaultCpf.includeCpf55WithdrawableInTimeline,
+  };
+  if (typeof cpfData.enabled !== 'undefined') return merged;
+  if (typeof legacyCpfEnabled !== 'undefined') {
+    return { ...merged, enabled: Boolean(legacyCpfEnabled) };
+  }
+
+  return {
+    ...merged,
+    enabled: (
+      Number(merged.oaBalance) > 0 ||
+      Number(merged.saBalance) > 0 ||
+      Number(merged.maBalance) > 0 ||
+      Number(merged.monthlyContribution) > 0
+    ),
+  };
 }
 
 function buildDataFilename(clientName, exportDate) {

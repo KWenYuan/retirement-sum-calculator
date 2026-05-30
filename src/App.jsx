@@ -49,11 +49,12 @@ import {
   calculateNeeds,
   formatCurrency,
   getAgeTimelineDetails,
+  hasCpfProjectionData,
   getRetirementTimelineEndAge,
   startLaterComparison,
 } from './utils/projections.js';
 
-const disclaimer = 'This calculator is for illustration and discussion purposes only. Figures are based on assumptions entered and are not guaranteed. Actual returns, CPF rules, SRS treatment, policy values, fees, withdrawals, taxation and market conditions may differ. Please refer to official policy documents and CPF/SRS guidelines where applicable.';
+const disclaimer = 'This calculator is for illustration and discussion purposes only. Figures are based on assumptions entered and are not guaranteed. Future CPF retirement sums are estimated using an advisor-entered BRS growth assumption. Actual returns, CPF BRS, FRS, ERS, CPF LIFE payouts, CPF/SRS treatment, policy values, fees, withdrawals, taxation and market conditions may differ. Please refer to official policy documents and CPF/SRS guidelines where applicable.';
 const VIEW_MODE_STORAGE_KEY = 'retirementProjectionViewMode';
 
 export default function App() {
@@ -302,7 +303,7 @@ export default function App() {
             />
 
             <ProfileSection profile={profile} setProfile={setProfile} />
-            <CpfSection cpf={cpf} setCpf={setCpf} />
+            <CpfSection cpf={cpf} setCpf={setCpf} profile={profile} />
             <SrsSection srs={srs} setSrs={setSrs} />
             <CashSection cash={cash} setCash={setCash} />
             <PoliciesSection policies={policies} setPolicies={setPolicies} profile={profile} scenarioRate={scenarioRate} />
@@ -561,7 +562,9 @@ function KeyTakeaways({ profile, retirementPoint, incomeSources, needs, cpf }) {
   const takeaways = [
     `Your projected retirement assets are ${formatCurrency(retirementPoint.total)} by age ${profile.retirementAge}.`,
     `Your projected monthly income at the selected age is ${formatCurrency(incomeSources.totalMonthlyIncome)}/month.`,
-    cpf.enabled ? `CPF LIFE contributes ${formatCurrency(cpf.cpfLifeMonthlyPayout)}/month from age ${cpf.cpfLifePayoutStartAge}.` : 'CPF LIFE has not been included in this illustration.',
+    hasCpfProjectionData(cpf) && Number(cpf.cpfLifeMonthlyPayout) > 0
+      ? `CPF LIFE contributes ${formatCurrency(cpf.cpfLifeMonthlyPayout)}/month from age ${cpf.cpfLifePayoutStartAge}.`
+      : 'CPF LIFE has not been included in this illustration.',
     `The current projection shows an ${gapLabel} of ${formatCurrency(Math.abs(needs.surplusShortfall))}.`,
     planningOpportunity,
   ];

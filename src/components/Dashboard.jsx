@@ -17,6 +17,7 @@ import { Database, Download, FileText, FolderUp, Trash2, TrendingUp } from 'luci
 import { ASSET_COLORS, BREAKDOWN_COLORS, INVESTMENT_COLORS, POLICY_COLORS } from '../utils/chartColors.js';
 import {
   formatCurrency,
+  hasCpfProjectionData,
   isCashIncludedInProjection,
   projectCash,
   projectCpfAtAge,
@@ -67,7 +68,7 @@ export function Dashboard({
     return true;
   });
   const breakdownData = [
-    { name: 'CPF', value: selectedBreakdown.cpf },
+    ...(hasCpfProjectionData(cpf) ? [{ name: 'CPF', value: selectedBreakdown.cpf }] : []),
     { name: 'SRS', value: selectedBreakdown.srs },
     { name: 'Policies', value: selectedBreakdown.policies },
     { name: 'Investments', value: selectedBreakdown.investments },
@@ -365,7 +366,7 @@ function updateSelectedAgeFromChart(state, setSelectedAge) {
 
 function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash, scenarioRate, timeline }) {
   const series = [{ key: 'total', name: 'Total', color: ASSET_COLORS.total }];
-  if (cpf.enabled) series.push({ key: 'cpf', name: 'CPF', color: ASSET_COLORS.cpf });
+  if (hasCpfProjectionData(cpf)) series.push({ key: 'cpf', name: 'CPF', color: ASSET_COLORS.cpf });
   if (srs.enabled) series.push({ key: 'srs', name: 'SRS', color: ASSET_COLORS.srs });
   policies.forEach((policy, index) => {
     series.push({
@@ -388,7 +389,7 @@ function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash,
     const age = Number(point.age);
     const years = Math.max(0, age - Number(profile.currentAge));
     const row = { age, total: point.total };
-    if (cpf.enabled) row.cpf = projectCpfAtAge(cpf, profile.currentAge, age);
+    if (hasCpfProjectionData(cpf)) row.cpf = projectCpfAtAge(cpf, profile.currentAge, age);
     if (srs.enabled) row.srs = projectSrs(srs, Number(profile.currentAge), age);
     policies.forEach((policy) => {
       row[`policy_${policy.id}`] = projectPolicy(policy, Number(profile.currentAge), age, scenarioRate);

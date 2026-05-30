@@ -1,3 +1,5 @@
+import { cpfRules } from '../config/cpfRules.js';
+
 export const SCENARIOS = {
   conservative: { label: 'Conservative', returnRate: 3 },
   balanced: { label: 'Balanced', returnRate: 5 },
@@ -27,7 +29,13 @@ export const defaultCpf = {
   annualInterest: 4,
   includeInTotal: true,
   frsAmountAt55: 230000,
-  cpfLifePayoutStartAge: 65,
+  brsGrowthRateAfterLastKnownYear: cpfRules.brsGrowthRateAfterLastKnownYear,
+  retirementSumType: 'FRS',
+  useManualRetirementSumAmount: false,
+  manualRetirementSumAmount: 230000,
+  minimumWithdrawalIfBelowFRS: cpfRules.defaultWithdrawalAt55IfBelowFRS,
+  includeCpf55WithdrawableInTimeline: true,
+  cpfLifePayoutStartAge: cpfRules.defaultCpfLifeStartAge,
   cpfLifeMonthlyPayout: 1800,
 };
 
