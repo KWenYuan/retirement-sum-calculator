@@ -80,12 +80,11 @@ export const projectPolicy = (policy, currentAge, targetAge, scenarioRate) => {
 
 const projectPolicyWithContributionDelay = (policy, currentAge, targetAge, scenarioRate, delayYears = 0, totalYears = null) => {
   const years = totalYears ?? Math.max(0, targetAge - currentAge);
-  const withdrawalAge = asNumber(policy.withdrawalAge) || targetAge;
-  if (targetAge > withdrawalAge) return 0;
+  const structure = getPolicyStructure(policy, targetAge);
+  if (structure.withdrawalType !== 'Keep invested / no withdrawal yet' && targetAge > structure.withdrawalStartAge) return 0;
 
   const annualPremium = asNumber(policy.premiumAmount) * (frequencyMultiplier[policy.premiumFrequency] || 12);
-  const elapsedYears = Math.max(0, currentAge - asNumber(policy.startAge));
-  const remainingPremiumYears = Math.max(0, asNumber(policy.premiumTermYears) - elapsedYears);
+  const remainingPremiumYears = Math.max(0, structure.premiumEndAge - currentAge - delayYears);
   const contributionYears = Math.max(0, Math.min(years - delayYears, remainingPremiumYears));
   const effectiveRate = getEffectiveRate(policy.annualReturn, policy.useScenarioReturn, scenarioRate);
 
@@ -93,6 +92,35 @@ const projectPolicyWithContributionDelay = (policy, currentAge, targetAge, scena
   const premiumGrowthToPaymentEnd = annualContributionFutureValue(annualPremium, effectiveRate, contributionYears);
   const premiumGrowthToTarget = compoundAnnual(premiumGrowthToPaymentEnd, effectiveRate, years - delayYears - contributionYears);
   return currentGrowth + premiumGrowthToTarget;
+};
+
+export const getPolicyStructure = (policy, fallbackAge = 65) => {
+  const startAge = asNumber(policy.startAge);
+  const premiumCommitmentTerm = asNumber(policy.premiumCommitmentTerm ?? policy.premiumTermYears);
+  const commitmentEndAge = startAge + premiumCommitmentTerm;
+  const holdingUntilAge = asNumber(policy.holdingUntilAge ?? policy.withdrawalStartAge ?? policy.withdrawalAge) || fallbackAge;
+  const withdrawalStartAge = asNumber(policy.withdrawalStartAge ?? policy.withdrawalAge ?? holdingUntilAge) || holdingUntilAge;
+  const withdrawalType = policy.withdrawalType || 'Lump sum';
+  const continuedPremiumEndAge = policy.continuePremiumsAfterCommitment
+    ? asNumber(policy.continuedPremiumEndAge ?? holdingUntilAge) || holdingUntilAge
+    : commitmentEndAge;
+  const premiumEndAge = Math.max(commitmentEndAge, continuedPremiumEndAge);
+  const withdrawalEndAge = asNumber(policy.withdrawalEndAge) || withdrawalStartAge + 10;
+  const withdrawalDuration = Math.max(1, withdrawalEndAge - withdrawalStartAge);
+
+  return {
+    startAge,
+    premiumCommitmentTerm,
+    commitmentEndAge,
+    continuedPremiumEndAge,
+    premiumEndAge,
+    holdingUntilAge,
+    withdrawalStartAge,
+    withdrawalEndAge,
+    withdrawalDuration,
+    withdrawalType,
+    postCommitmentGrowthYears: Math.max(0, holdingUntilAge - commitmentEndAge),
+  };
 };
 
 export const projectInvestment = (investment, years, scenarioRate) => {
@@ -205,11 +233,11 @@ export const buildRetirementTimeline = (state) => {
   };
 
   state.policies.forEach((policy) => {
-    const policyStartAge = asNumber(policy.startAge) || startAge;
-    const premiumEndAge = policyStartAge + asNumber(policy.premiumTermYears);
-    const withdrawalAge = asNumber(policy.withdrawalAge) || premiumEndAge;
+    const structure = getPolicyStructure(policy, state.profile.retirementAge);
+    const withdrawalAge = structure.withdrawalStartAge || structure.holdingUntilAge;
     const projectedValue = projectPolicy(policy, startAge, withdrawalAge, state.scenarioRate);
-    const type = policy.withdrawalType || 'Lump sum';
+    const type = structure.withdrawalType;
+    if (type === 'Keep invested / no withdrawal yet') return;
     if (type === 'Lump sum') {
       addLumpSum({
         age: withdrawalAge,
@@ -220,7 +248,7 @@ export const buildRetirementTimeline = (state) => {
       });
       return;
     }
-    const end = Math.max(withdrawalAge + 1, asNumber(policy.withdrawalEndAge) || withdrawalAge + 10);
+    const end = Math.max(withdrawalAge + 1, structure.withdrawalEndAge);
     const duration = Math.max(1, end - withdrawalAge);
     const frequency = type === 'Monthly income' ? 'monthly' : 'yearly';
     const amount = frequency === 'monthly' ? projectedValue / (duration * 12) : projectedValue / duration;

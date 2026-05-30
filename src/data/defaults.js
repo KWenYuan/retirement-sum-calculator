@@ -65,11 +65,18 @@ export const starterPolicies = [
     premiumAmount: 800,
     premiumFrequency: 'monthly',
     premiumTermYears: 15,
+    policyStructure: 'Investment policy with fixed premium commitment',
+    premiumCommitmentTerm: 15,
+    continuePremiumsAfterCommitment: false,
+    continuedPremiumEndAge: 51,
     annualReturn: 4.5,
     useScenarioReturn: true,
+    holdingUntilAge: 65,
     withdrawalAge: 65,
+    withdrawalStartAge: 65,
     withdrawalType: 'Lump sum',
     withdrawalEndAge: 75,
+    showClientExplanation: false,
   },
 ];
 

@@ -443,6 +443,105 @@ textarea:focus {
   border-top: 1px solid var(--line);
 }
 
+.policy-phase-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.policy-phase-badges span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eef4fb;
+  color: var(--navy);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.policy-mini-timeline {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.policy-mini-line {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 14px;
+}
+
+.policy-mini-line::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: #cfd8e5;
+}
+
+.policy-mini-line span {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 2px 8px rgba(16, 42, 76, 0.18);
+}
+
+.policy-mini-labels,
+.policy-mini-phases {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.policy-mini-labels b,
+.policy-mini-phases span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.policy-mini-phases span {
+  max-width: 92px;
+  text-align: center;
+}
+
+.policy-explanation,
+.policy-derived-panel {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475467;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.policy-derived-panel {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+}
+
+.policy-derived-panel span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.policy-derived-panel strong {
+  color: var(--navy);
+}
+
 .report-surface {
   min-width: 0;
 }

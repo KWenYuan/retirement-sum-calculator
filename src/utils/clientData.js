@@ -187,8 +187,28 @@ function normalizeList(value, defaults) {
   return value.map((item, index) => ({
     ...fallback,
     ...item,
+    ...(fallback.premiumCommitmentTerm !== undefined ? normalizePolicyFields(item, fallback) : {}),
     id: item?.id || `imported-${index + 1}`,
   }));
+}
+
+function normalizePolicyFields(item = {}, fallback = {}) {
+  const startAge = item.startAge ?? fallback.startAge;
+  const commitmentTerm = item.premiumCommitmentTerm ?? item.premiumTermYears ?? fallback.premiumCommitmentTerm;
+  const withdrawalAge = item.withdrawalStartAge ?? item.withdrawalAge ?? fallback.withdrawalStartAge;
+  return {
+    policyStructure: item.policyStructure || fallback.policyStructure || 'Custom',
+    premiumCommitmentTerm: commitmentTerm,
+    premiumTermYears: item.premiumTermYears ?? commitmentTerm,
+    continuePremiumsAfterCommitment: Boolean(item.continuePremiumsAfterCommitment),
+    continuedPremiumEndAge: item.continuedPremiumEndAge ?? item.holdingUntilAge ?? withdrawalAge,
+    holdingUntilAge: item.holdingUntilAge ?? withdrawalAge,
+    withdrawalStartAge: withdrawalAge,
+    withdrawalAge,
+    withdrawalEndAge: item.withdrawalEndAge ?? (Number(withdrawalAge) || Number(startAge) || 0) + 10,
+    withdrawalType: item.withdrawalType || fallback.withdrawalType || 'Lump sum',
+    showClientExplanation: Boolean(item.showClientExplanation),
+  };
 }
 
 function normalizeTasks(value) {

@@ -104,9 +104,11 @@ export function buildChangedSinceLastReview(previousReviewData, currentState, co
   addNumberChange(changes, 'SRS', 'SRS withdrawal duration', previous.srs.withdrawalDurationYears, currentState.srs.withdrawalDurationYears, 'years');
 
   compareNamedItems(changes, 'Policies', previous.policies || [], currentState.policies || [], 'policy', [
+    ['premiumCommitmentTerm', 'premium commitment', 'years'],
     ['premiumAmount', 'premium', 'currency'],
     ['currentValue', 'current value', 'currency'],
-    ['withdrawalAge', 'withdrawal age', 'number'],
+    ['holdingUntilAge', 'holding age', 'number'],
+    ['withdrawalStartAge', 'withdrawal age', 'number'],
     ['withdrawalType', 'payout type', 'text'],
   ]);
 
