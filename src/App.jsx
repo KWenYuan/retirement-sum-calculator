@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import html2pdf from 'html2pdf.js';
-import { BriefcaseBusiness, ShieldCheck } from 'lucide-react';
-import { Dashboard, ScenarioTabs } from './components/Dashboard.jsx';
+import { ShieldCheck } from 'lucide-react';
+import { Dashboard } from './components/Dashboard.jsx';
 import { AnnualReview } from './components/AnnualReview.jsx';
 import { ExportReport } from './components/ExportReport.jsx';
 import { FollowUpTasks } from './components/FollowUpTasks.jsx';
@@ -256,20 +256,19 @@ export default function App() {
           </div>
         </div>
 
-        <div className="sidebar-card">
-          <div>
-            <BriefcaseBusiness size={18} />
-            <span>Scenario</span>
-          </div>
-          <ScenarioTabs scenario={scenario} setScenario={setScenario} scenarios={SCENARIOS} />
-        </div>
+        <SidebarInputSummary
+          profile={profile}
+          retirementPoint={retirementPoint}
+          incomeSources={incomeSources}
+          needs={needs}
+        />
 
         <ProfileSection profile={profile} setProfile={setProfile} />
         <CpfSection cpf={cpf} setCpf={setCpf} />
         <SrsSection srs={srs} setSrs={setSrs} />
         <CashSection cash={cash} setCash={setCash} />
-        <PoliciesSection policies={policies} setPolicies={setPolicies} />
-        <InvestmentsSection investments={investments} setInvestments={setInvestments} />
+        <PoliciesSection policies={policies} setPolicies={setPolicies} profile={profile} scenarioRate={scenarioRate} />
+        <InvestmentsSection investments={investments} setInvestments={setInvestments} profile={profile} scenarioRate={scenarioRate} />
       </aside>
 
       <div className="report-surface">
@@ -349,7 +348,6 @@ export default function App() {
             policies={policies}
             investments={investments}
             cash={cash}
-            scenario={SCENARIOS[scenario].label}
             scenarioRate={scenarioRate}
             retirementPoint={retirementPoint}
             needs={needs}
@@ -393,6 +391,34 @@ function buildReportFilename(clientName, exportDate) {
 }
 
 function SummaryItem({ label, value }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function SidebarInputSummary({ profile, retirementPoint, incomeSources, needs }) {
+  return (
+    <section className="sidebar-summary-card">
+      <div>
+        <span>Client</span>
+        <strong>{profile.clientName || 'Client'}</strong>
+      </div>
+      <div className="sidebar-summary-grid">
+        <SummaryMini label="Current Age" value={profile.currentAge} />
+        <SummaryMini label="Retirement Age" value={profile.retirementAge} />
+        <SummaryMini label="Desired Income" value={`${formatCurrency(profile.desiredMonthlyIncome)}/mo`} />
+        <SummaryMini label="Projected Amount" value={formatCurrency(retirementPoint.total, true)} />
+        <SummaryMini label="Projected Income" value={`${formatCurrency(incomeSources.totalMonthlyIncome)}/mo`} />
+        <SummaryMini label={needs.surplusShortfall >= 0 ? 'Surplus' : 'Shortfall'} value={formatCurrency(needs.surplusShortfall, true)} />
+      </div>
+    </section>
+  );
+}
+
+function SummaryMini({ label, value }) {
   return (
     <div>
       <span>{label}</span>

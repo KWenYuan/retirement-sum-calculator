@@ -20,7 +20,6 @@ export function ExportReport({
   policies,
   investments,
   cash,
-  scenario,
   scenarioRate,
   retirementPoint,
   needs,
@@ -73,7 +72,6 @@ export function ExportReport({
         <h1>{profile.clientName || 'Client'}</h1>
         <div className="export-meta">
           <span>Date of export: {exportDate}</span>
-          <span>Scenario: {scenario} ({scenarioRate}% return assumption)</span>
         </div>
       </header>
 

@@ -17,24 +17,6 @@ import { formatCurrency } from '../utils/projections.js';
 
 const COLORS = ['#15345f', '#c49a43', '#4d7ea8', '#78a083', '#d9a441'];
 
-export function ScenarioTabs({ scenario, setScenario, scenarios }) {
-  return (
-    <div className="scenario-tabs" aria-label="Projection scenario">
-      {Object.entries(scenarios).map(([key, item]) => (
-        <button
-          key={key}
-          type="button"
-          className={scenario === key ? 'active' : ''}
-          onClick={() => setScenario(key)}
-        >
-          {item.label}
-          <small>{item.returnRate}%</small>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function Dashboard({
   profile,
   timeline,
