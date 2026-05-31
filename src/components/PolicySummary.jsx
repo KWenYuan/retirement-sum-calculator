@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import html2pdf from 'html2pdf.js';
 import { Copy, Download, FileJson, FolderUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { NumberField, SelectField, TextField } from './FormControls.jsx';
+import { PolicySummaryExportReport } from './PolicySummaryExportReport.jsx';
 import {
   calculatePolicyPremium,
   calculatePolicySummary,
@@ -21,12 +22,12 @@ import {
 
 const disclaimer = 'This policy summary is prepared based on information provided and is for discussion purposes only. Please refer to the official policy contracts, benefit illustrations and insurer documents for exact benefits, exclusions, values, terms and conditions.';
 
-const premiumFrequencies = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Single Premium'];
-const policyStatuses = ['In-force', 'Pending', 'Lapsed', 'Paid-up', 'Cancelled'];
-const payStatuses = ['Paying', 'Fully paid', 'Waived', 'Lapsed', 'Unknown'];
+const premiumFrequencies = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Single Premium', 'Unknown'];
+const policyStatuses = ['In-force', 'Lapsed', 'Matured', 'Cancelled', 'Pending', 'Paid-up', 'Unknown'];
+const payStatuses = ['Paying', 'Fully paid', 'Waived', 'Lapsed', 'In-force', 'Unknown'];
 const coverageStatuses = ['Active', 'Ended', 'Pending', 'Unknown'];
 const premiumPayableTypes = ['Fixed term', 'To age', 'Whole life / ongoing', 'Single premium', 'Fully paid', 'Unknown'];
-const coverageTypes = ['Fixed term', 'To age', 'Whole life / lifetime', 'Yearly renewable', 'Unknown'];
+const coverageTypes = ['Fixed term', 'To age', 'Whole life / lifetime', 'Yearly renewable', 'To maturity', 'Unknown'];
 
 const policyRows = [
   { label: 'Company', get: (policy) => textValue(policy.company) },
@@ -104,12 +105,12 @@ export function PolicySummary({ viewMode = 'advisor' }) {
     setError('');
     try {
       await html2pdf().set({
-        margin: 8,
+        margin: 6,
         filename: buildPolicySummaryPdfFilename(client.clientName, exportDate),
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1120 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1040 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        pagebreak: { mode: ['css', 'legacy'], avoid: ['.avoid-break'], before: ['.page-break'] },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-avoid-break', '.avoid-break'], before: ['.pdf-page-break', '.page-break'] },
       }).from(reportRef.current).save();
     } catch (pdfError) {
       console.error('Policy summary PDF export failed:', pdfError);
@@ -136,11 +137,15 @@ export function PolicySummary({ viewMode = 'advisor' }) {
       setPolicies(restored.policies);
       setBenchmark(restored.benchmark);
       setNotes(restored.notes);
-      setMessage('Policy summary data imported successfully.');
+      const policyCount = restored.importReport?.policyCount ?? restored.policies.length;
+      const cleanedMessage = restored.importReport?.cleanedPolicies > 0
+        ? ' Some missing or unknown fields were converted to safe defaults.'
+        : '';
+      setMessage(`Imported ${policyCount} ${policyCount === 1 ? 'policy' : 'policies'} successfully.${cleanedMessage}`);
       setError('');
     } catch (importError) {
       console.error('Policy summary import failed:', importError);
-      setError(importError.message || 'Invalid policy summary data file.');
+      setError('Policy Summary import failed. Some fields may be in an unsupported format.');
       setMessage('');
     }
   };
@@ -224,7 +229,6 @@ export function PolicySummary({ viewMode = 'advisor' }) {
       )}
 
       <PolicySummaryReport
-        refNode={reportRef}
         client={client}
         policies={policies}
         summary={summary}
@@ -233,6 +237,17 @@ export function PolicySummary({ viewMode = 'advisor' }) {
         selectedTimelinePolicy={selectedTimelinePolicy}
         setSelectedTimelinePolicyId={setSelectedTimelinePolicyId}
       />
+
+      <div className="policy-export-hidden" aria-hidden="true">
+        <PolicySummaryExportReport
+          refNode={reportRef}
+          client={client}
+          policies={policies}
+          summary={summary}
+          benchmark={benchmark}
+          notes={notes}
+        />
+      </div>
 
       <input
         ref={importRef}
@@ -342,9 +357,9 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
   );
 }
 
-function PolicySummaryReport({ refNode, client, policies, summary, benchmark, notes, selectedTimelinePolicy, setSelectedTimelinePolicyId }) {
+function PolicySummaryReport({ client, policies, summary, benchmark, notes, selectedTimelinePolicy, setSelectedTimelinePolicyId }) {
   return (
-    <section className="policy-report panel" ref={refNode}>
+    <section className="policy-report panel">
       <header className="policy-report-header avoid-break">
         <div>
           <p>Personal Wealth Planning for</p>
@@ -446,10 +461,15 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
     : 85;
   const range = Math.max(1, maxAge - minAge);
   const ticks = buildPolicyTimelineTicks(minAge, maxAge);
-  const toStyle = (period) => ({
-    left: `${Math.max(0, ((period.startAge - minAge) / range) * 100)}%`,
-    width: `${Math.max(period.startAge === period.endAge ? 2 : 4, ((period.endAge - period.startAge) / range) * 100)}%`,
-  });
+  const toStyle = (period) => {
+    if (!period?.hasBar || !isValidTimelineAge(period.startAge) || !isValidTimelineAge(period.endAge)) {
+      return {};
+    }
+    return {
+      left: `${Math.max(0, ((period.startAge - minAge) / range) * 100)}%`,
+      width: `${Math.max(period.startAge === period.endAge ? 2 : 4, ((period.endAge - period.startAge) / range) * 100)}%`,
+    };
+  };
 
   return (
     <section className="policy-timeline-section avoid-break">
@@ -492,8 +512,8 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
                       style={{ left: `${((tick - minAge) / range) * 100}%` }}
                     />
                   ))}
-                  <TimelineBar period={premium} type="premium" style={toStyle(premium)} />
-                  <TimelineBar period={coverage} type="coverage" style={toStyle(coverage)} />
+                  <TimelineBar period={premium} type="premium" style={premium.hasBar ? toStyle(premium) : {}} />
+                  <TimelineBar period={coverage} type="coverage" style={coverage.hasBar ? toStyle(coverage) : {}} />
                 </div>
                 <span className={`policy-status-badge ${getStatusClass(policy)}`}>{getTimelineStatus(policy)}</span>
               </button>
@@ -560,7 +580,7 @@ function buildPolicyTimelineTicks(minAge, maxAge) {
 }
 
 function TimelineBar({ period, type, style }) {
-  if (!period.hasBar) {
+  if (!period?.hasBar) {
     return <span className={`timeline-bar-text ${type}`}>{period.label}</span>;
   }
   return (
@@ -605,6 +625,10 @@ function SummaryLine({ label, value, tone }) {
 
 function textValue(value) {
   return value || '-';
+}
+
+function isValidTimelineAge(value) {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function buildPolicySummaryPdfFilename(clientName, date) {
