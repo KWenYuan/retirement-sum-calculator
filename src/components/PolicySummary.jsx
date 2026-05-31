@@ -4,14 +4,23 @@ import { Copy, Download, FileJson, FolderUp, Pencil, Plus, Trash2 } from 'lucide
 import { NumberField, SelectField, TextField } from './FormControls.jsx';
 import { PolicySummaryExportReport } from './PolicySummaryExportReport.jsx';
 import {
+  benefitCoverageDefinitions,
   calculatePolicyPremium,
+  calculatePolicyTablePremiumTotalsByCurrency,
   calculatePolicySummary,
   createPolicySummaryPolicy,
   defaultPolicyBenchmark,
   defaultPolicySummaryClient,
   defaultPolicySummaryNotes,
   downloadPolicySummaryData,
+  formatCurrencyTotals,
+  formatDisplayDate,
   formatPolicyCurrency,
+  formatPolicyCurrencyWithLabel,
+  formatPolicyTimelinePremium,
+  getBenefitCoverageDetails,
+  getBenefitCoverageDifferences,
+  getPolicyTablePremiumValues,
   getCoveragePeriod,
   getPremiumPeriod,
   importPolicySummaryData,
@@ -34,13 +43,10 @@ const policyRows = [
   { label: 'Policy No.', get: (policy) => textValue(policy.policyNumber) },
   { label: 'Type of Plan', get: (policy) => textValue(policy.typeOfPlan) },
   { label: 'Plan Name', get: (policy) => textValue(policy.planName) },
-  { label: 'Policy Status', get: (policy) => textValue(policy.policyStatus) },
-  { label: 'Pay Status', get: (policy) => textValue(policy.payStatus) },
-  { label: 'Premium Frequency', get: (policy) => textValue(policy.premiumFrequency) },
-  { label: 'Monthly Premium', totalKey: 'monthlyPremium', get: (policy) => formatPolicyCurrency(calculatePolicyPremium(policy).monthly, policy.currency) },
-  { label: 'Annual Premium', totalKey: 'annualPremium', get: (policy) => formatPolicyCurrency(calculatePolicyPremium(policy).annual, policy.currency) },
+  { label: 'Policy Start Date', get: (policy) => formatDisplayDate(policy.startDate) },
+  { label: 'Monthly Premium', totalKey: 'monthlyPremium', premiumTableTotal: true, get: (policy) => getPolicyTablePremiumValues(policy).monthlyDisplay },
+  { label: 'Annual Premium', totalKey: 'annualPremium', premiumTableTotal: true, get: (policy) => getPolicyTablePremiumValues(policy).annualDisplay },
   { label: 'Premium Payable Period', get: (policy) => getPremiumPeriod(policy).label },
-  { label: 'Coverage Period', get: (policy) => getCoveragePeriod(policy).label },
   { label: 'Death', totalKey: 'death', highlight: true, get: (policy) => formatPolicyCurrency(policy.deathBenefit, policy.currency) },
   { label: 'TPD', totalKey: 'tpd', highlight: true, get: (policy) => formatPolicyCurrency(policy.tpdBenefit, policy.currency) },
   { label: 'ECI', totalKey: 'eci', highlight: true, get: (policy) => formatPolicyCurrency(policy.eciBenefit, policy.currency) },
@@ -48,8 +54,6 @@ const policyRows = [
   { label: 'Hospitalisation', highlight: true, get: (policy) => textValue(policy.hospitalisation) },
   { label: 'Accident', totalKey: 'accident', highlight: true, get: (policy) => formatPolicyCurrency(policy.personalAccident, policy.currency) },
   { label: 'Disability Income', totalKey: 'disabilityIncome', highlight: true, get: (policy) => formatPolicyCurrency(policy.disabilityIncome, policy.currency) },
-  { label: 'Owner', get: (policy) => textValue(policy.owner) },
-  { label: 'Life Assured', get: (policy) => textValue(policy.lifeAssured) },
   { label: 'Notes', get: (policy) => textValue(policy.notes || policy.remarks) },
 ];
 
@@ -84,7 +88,7 @@ export function PolicySummary({ viewMode = 'advisor' }) {
 
   const updatePolicy = (id, key, value) => {
     setPolicies((current) => current.map((policy) => (
-      policy.id === id ? { ...policy, [key]: value } : policy
+      policy.id === id ? normalizePolicyPremiumFields({ ...policy, [key]: value }) : policy
     )));
   };
 
@@ -262,6 +266,15 @@ export function PolicySummary({ viewMode = 'advisor' }) {
 
 function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePolicy, deletePolicy }) {
   const premium = calculatePolicyPremium(policy);
+  const updateBenefitCoverage = (benefitKey, field, value) => {
+    updatePolicy(policy.id, 'benefitCoveragePeriods', {
+      ...(policy.benefitCoveragePeriods || {}),
+      [benefitKey]: {
+        ...(policy.benefitCoveragePeriods?.[benefitKey] || {}),
+        [field]: value,
+      },
+    });
+  };
   return (
     <div className="compact-item-card policy-summary-card">
       <div className="compact-item-summary">
@@ -269,7 +282,7 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
           <strong>{policy.planName || 'Policy'}</strong>
           <span>Company: {textValue(policy.company)}</span>
           <span>Type: {textValue(policy.typeOfPlan)}</span>
-          <span>Premium: {formatPolicyCurrency(policy.premiumAmount, policy.currency)}/{policy.premiumFrequency}</span>
+          <span>Premium: {formatPolicyTimelinePremium(policy)}</span>
           <span>Death: {formatPolicyCurrency(policy.deathBenefit, policy.currency)} | CI: {formatPolicyCurrency(policy.ciBenefit, policy.currency)}</span>
         </div>
         <div className="compact-item-value">
@@ -297,7 +310,6 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
               <TextField label="Currency" value={policy.currency} onChange={(value) => updatePolicy(policy.id, 'currency', value)} />
               <TextField label="Owner" value={policy.owner} onChange={(value) => updatePolicy(policy.id, 'owner', value)} />
               <TextField label="Life assured" value={policy.lifeAssured} onChange={(value) => updatePolicy(policy.id, 'lifeAssured', value)} />
-              <TextField label="Remarks" value={policy.remarks} onChange={(value) => updatePolicy(policy.id, 'remarks', value)} />
             </div>
           </details>
           <details className="advanced-block" open>
@@ -305,10 +317,32 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
             <div className="form-grid compact input-compact-grid">
               <NumberField label="Premium amount" prefix="$" value={policy.premiumAmount} onChange={(value) => updatePolicy(policy.id, 'premiumAmount', value)} />
               <SelectField label="Premium frequency" value={policy.premiumFrequency} onChange={(value) => updatePolicy(policy.id, 'premiumFrequency', value)} options={premiumFrequencies} />
-              <NumberField label="Premium payable start age" value={policy.premiumPayableStartAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableStartAge', value)} />
-              <NumberField label="Premium payable end age" value={policy.premiumPayableEndAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableEndAge', value)} />
-              <NumberField label="Premium payable duration" suffix="years" value={policy.premiumPayableDuration} onChange={(value) => updatePolicy(policy.id, 'premiumPayableDuration', value)} />
               <SelectField label="Premium payable type" value={policy.premiumPayableType} onChange={(value) => updatePolicy(policy.id, 'premiumPayableType', value)} options={premiumPayableTypes} />
+              {policy.premiumPayableType === 'Fixed term' && (
+                <>
+                  <NumberField label="Premium payable start age" value={policy.premiumPayableStartAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableStartAge', value)} />
+                  <NumberField label="Premium payable duration" suffix="years" value={policy.premiumPayableDuration} onChange={(value) => updatePolicy(policy.id, 'premiumPayableDuration', value)} />
+                  <NumberField label="Premium payable end age" value={policy.premiumPayableEndAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableEndAge', value)} />
+                </>
+              )}
+              {policy.premiumPayableType === 'To age' && (
+                <>
+                  <NumberField label="Premium payable start age" value={policy.premiumPayableStartAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableStartAge', value)} />
+                  <NumberField label="Premium payable end age" value={policy.premiumPayableEndAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableEndAge', value)} />
+                </>
+              )}
+              {policy.premiumPayableType === 'Whole life / ongoing' && (
+                <NumberField label="Premium payable start age" value={policy.premiumPayableStartAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableStartAge', value)} />
+              )}
+              {policy.premiumPayableType === 'Single premium' && (
+                <NumberField label="Single premium age" value={policy.premiumPayableStartAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableStartAge', value)} />
+              )}
+              {policy.premiumPayableType === 'Fully paid' && (
+                <>
+                  <NumberField label="Premium start age (optional)" value={policy.premiumPayableStartAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableStartAge', value)} />
+                  <NumberField label="Paid-up age (optional)" value={policy.premiumPayableEndAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableEndAge', value)} />
+                </>
+              )}
               <TextField label="Payment term" value={policy.paymentTerm} onChange={(value) => updatePolicy(policy.id, 'paymentTerm', value)} />
               <SelectField label="Pay status" value={policy.payStatus} onChange={(value) => updatePolicy(policy.id, 'payStatus', value)} options={payStatuses} />
             </div>
@@ -331,23 +365,41 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
               <SelectField label="Coverage type" value={policy.coverageType} onChange={(value) => updatePolicy(policy.id, 'coverageType', value)} options={coverageTypes} />
               <SelectField label="Coverage status" value={policy.coverageStatus} onChange={(value) => updatePolicy(policy.id, 'coverageStatus', value)} options={coverageStatuses} />
             </div>
+            <details className="benefit-coverage-block">
+              <summary>Benefit Coverage Periods</summary>
+              <p>Use this only when a specific benefit ends earlier or later than the main policy coverage period.</p>
+              <div className="benefit-coverage-grid">
+                <span>Benefit</span>
+                <span>Start age</span>
+                <span>End age</span>
+                {benefitCoverageDefinitions.map((benefit) => (
+                  <div className="benefit-coverage-row" key={benefit.key}>
+                    <strong>{benefit.label}</strong>
+                    <NumberField
+                      label={`${benefit.label} start age`}
+                      value={policy.benefitCoveragePeriods?.[benefit.key]?.startAge ?? ''}
+                      onChange={(value) => updateBenefitCoverage(benefit.key, 'startAge', value)}
+                    />
+                    <NumberField
+                      label={`${benefit.label} end age`}
+                      value={policy.benefitCoveragePeriods?.[benefit.key]?.endAge ?? ''}
+                      onChange={(value) => updateBenefitCoverage(benefit.key, 'endAge', value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </details>
           </details>
           <details className="advanced-block">
             <summary>Policy Values</summary>
             <div className="form-grid compact input-compact-grid">
-              <TextField label="Maturity date" value={policy.maturityDate} onChange={(value) => updatePolicy(policy.id, 'maturityDate', value)} />
-              <NumberField label="Maturity age" value={policy.maturityAge} onChange={(value) => updatePolicy(policy.id, 'maturityAge', value)} />
               <NumberField label="Cash value" prefix="$" value={policy.cashValue} onChange={(value) => updatePolicy(policy.id, 'cashValue', value)} />
-              <NumberField label="Surrender value" prefix="$" value={policy.surrenderValue} onChange={(value) => updatePolicy(policy.id, 'surrenderValue', value)} />
-              <NumberField label="Investment value" prefix="$" value={policy.investmentValue} onChange={(value) => updatePolicy(policy.id, 'investmentValue', value)} />
-              <NumberField label="Maturity value" prefix="$" value={policy.maturityValue} onChange={(value) => updatePolicy(policy.id, 'maturityValue', value)} />
             </div>
           </details>
           <details className="advanced-block">
             <summary>Notes / Estate / Admin</summary>
             <div className="form-grid compact input-compact-grid">
-              <TextField label="Beneficiary / nomination" value={policy.beneficiaryStatus} onChange={(value) => updatePolicy(policy.id, 'beneficiaryStatus', value)} />
-              <TextField label="Assignment status" value={policy.assignmentStatus} onChange={(value) => updatePolicy(policy.id, 'assignmentStatus', value)} />
+              <TextField label="Remarks" value={policy.remarks} onChange={(value) => updatePolicy(policy.id, 'remarks', value)} />
               <TextField label="Notes" value={policy.notes} onChange={(value) => updatePolicy(policy.id, 'notes', value)} />
             </div>
           </details>
@@ -390,31 +442,46 @@ function PolicySummaryReport({ client, policies, summary, benchmark, notes, sele
       <div className="policy-summary-grid">
         <section className="policy-mini-panel avoid-break">
           <h3>Premium Summary</h3>
-          <SummaryLine label="Total monthly premium" value={formatPolicyCurrency(summary.totals.monthlyPremium)} />
-          <SummaryLine label="Total annual premium" value={formatPolicyCurrency(summary.totals.annualPremium)} />
-          <SummaryLine label="Single premium entered" value={formatPolicyCurrency(summary.totals.singlePremium)} />
+          <SummaryLine label="Total monthly premium" value={<CurrencyTotalValue summary={summary} totalKey="monthlyPremium" />} />
+          <SummaryLine label="Total annual premium" value={<CurrencyTotalValue summary={summary} totalKey="annualPremium" />} />
+          <SummaryLine label="Single premium entered" value={<CurrencyTotalValue summary={summary} totalKey="singlePremium" />} />
         </section>
 
         <section className="policy-mini-panel avoid-break">
           <h3>Coverage Summary</h3>
-          <SummaryLine label="Death" value={formatPolicyCurrency(summary.totals.death)} />
-          <SummaryLine label="TPD" value={formatPolicyCurrency(summary.totals.tpd)} />
-          <SummaryLine label="ECI" value={formatPolicyCurrency(summary.totals.eci)} />
-          <SummaryLine label="CI" value={formatPolicyCurrency(summary.totals.ci)} />
+          <SummaryLine label="Death" value={<CurrencyTotalValue summary={summary} totalKey="death" />} />
+          <SummaryLine label="TPD" value={<CurrencyTotalValue summary={summary} totalKey="tpd" />} />
+          <SummaryLine label="ECI" value={<CurrencyTotalValue summary={summary} totalKey="eci" />} />
+          <SummaryLine label="CI" value={<CurrencyTotalValue summary={summary} totalKey="ci" />} />
           <SummaryLine label="Hospitalisation" value={summary.hospitalisationSummary} />
-          <SummaryLine label="Accident" value={formatPolicyCurrency(summary.totals.accident)} />
-          <SummaryLine label="Disability income" value={formatPolicyCurrency(summary.totals.disabilityIncome)} />
+          <SummaryLine label="Accident" value={<CurrencyTotalValue summary={summary} totalKey="accident" />} />
+          <SummaryLine label="Disability income" value={<CurrencyTotalValue summary={summary} totalKey="disabilityIncome" />} />
         </section>
 
         <section className="policy-mini-panel avoid-break">
           <h3>Policy Gap Summary</h3>
-          <SummaryLine label="Annual income benchmark" value={formatPolicyCurrency(benchmark.annualIncome)} />
-          <SummaryLine label="Recommended death coverage" value={formatPolicyCurrency(summary.recommendedDeath)} />
-          <SummaryLine label="Current death coverage" value={formatPolicyCurrency(summary.totals.death)} />
-          <SummaryLine label="Death gap / surplus" value={formatPolicyCurrency(summary.deathGap)} tone={summary.deathGap >= 0 ? 'positive' : 'negative'} />
-          <SummaryLine label="Recommended CI coverage" value={formatPolicyCurrency(summary.recommendedCi)} />
-          <SummaryLine label="Current CI coverage" value={formatPolicyCurrency(summary.totals.ci)} />
-          <SummaryLine label="CI gap / surplus" value={formatPolicyCurrency(summary.ciGap)} tone={summary.ciGap >= 0 ? 'positive' : 'negative'} />
+          <SummaryLine label={`${summary.benchmarkCurrency} annual income benchmark`} value={formatPolicyCurrencyWithLabel(benchmark.annualIncome, summary.benchmarkCurrency)} />
+          {summary.currencies.map((currency) => {
+            const gap = summary.gapsByCurrency[currency];
+            return (
+              <div className="currency-gap-block" key={currency}>
+                <span>{currency}</span>
+                {gap.hasBenchmark ? (
+                  <strong>
+                    Death gap: {formatPolicyCurrencyWithLabel(gap.deathGap, currency)}
+                    <br />
+                    CI gap: {formatPolicyCurrencyWithLabel(gap.ciGap, currency)}
+                  </strong>
+                ) : (
+                  <strong>
+                    Death cover: {formatPolicyCurrencyWithLabel(gap.currentDeath, currency)}
+                    <br />
+                    No {currency} benchmark entered
+                  </strong>
+                )}
+              </div>
+            );
+          })}
         </section>
       </div>
 
@@ -428,6 +495,7 @@ function PolicySummaryReport({ client, policies, summary, benchmark, notes, sele
 }
 
 function PolicySummaryTable({ policies, summary }) {
+  const tablePremiumTotalsByCurrency = calculatePolicyTablePremiumTotalsByCurrency(policies);
   return (
     <table className="policy-summary-table">
       <thead>
@@ -442,7 +510,15 @@ function PolicySummaryTable({ policies, summary }) {
           <tr key={row.label} className={row.highlight ? 'coverage-row' : ''}>
             <th>{row.label}</th>
             {policies.map((policy) => <td key={`${policy.id}-${row.label}`}>{row.get(policy)}</td>)}
-            <td>{row.totalKey ? formatPolicyCurrency(summary.totals[row.totalKey]) : '-'}</td>
+            <td>
+              {row.totalKey ? (
+                <CurrencyTotalValue
+                  summary={summary}
+                  totalKey={row.totalKey}
+                  totalsByCurrency={row.premiumTableTotal ? tablePremiumTotalsByCurrency : undefined}
+                />
+              ) : '-'}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -451,7 +527,7 @@ function PolicySummaryTable({ policies, summary }) {
 }
 
 function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
-  const periods = policies.flatMap((policy) => [getPremiumPeriod(policy), getCoveragePeriod(policy)])
+  const periods = policies.flatMap((policy) => [getPremiumPeriod(policy), getCoveragePeriod(policy), ...getBenefitCoverageDifferences(policy)])
     .filter((period) => period.hasBar);
   const minAge = periods.length > 0
     ? Math.max(0, Math.floor(Math.min(...periods.map((period) => period.startAge)) / 5) * 5)
@@ -491,6 +567,7 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
           {policies.map((policy) => {
             const premium = getPremiumPeriod(policy);
             const coverage = getCoveragePeriod(policy);
+            const benefitDifferences = getBenefitCoverageDifferences(policy);
             return (
               <button
                 type="button"
@@ -501,7 +578,7 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
                 <div className="policy-timeline-name">
                   <strong>{policy.planName || 'Policy'}</strong>
                   <span>{policy.company || '-'} | {policy.policyStatus || '-'}</span>
-                  <small>{formatPolicyCurrency(policy.premiumAmount, policy.currency)}/{policy.premiumFrequency}</small>
+                  <small>{formatPolicyTimelinePremium(policy)}</small>
                 </div>
                 <div className="policy-timeline-track">
                   {ticks.map((tick) => (
@@ -514,6 +591,14 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
                   ))}
                   <TimelineBar period={premium} type="premium" style={premium.hasBar ? toStyle(premium) : {}} />
                   <TimelineBar period={coverage} type="coverage" style={coverage.hasBar ? toStyle(coverage) : {}} />
+                  {benefitDifferences.slice(0, 3).map((period, index) => (
+                    <TimelineBar
+                      key={`${policy.id}-${period.key}`}
+                      period={period}
+                      type={`benefit benefit-${index + 1}`}
+                      style={period.hasBar ? toStyle(period) : {}}
+                    />
+                  ))}
                 </div>
                 <span className={`policy-status-badge ${getStatusClass(policy)}`}>{getTimelineStatus(policy)}</span>
               </button>
@@ -534,14 +619,17 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
         <div className="policy-timeline-detail">
           <h3>{selectedPolicy.planName || 'Policy'}</h3>
           <div>
+            <SummaryLine label="Policy start date" value={formatDisplayDate(selectedPolicy.startDate)} />
             <SummaryLine label="Premium payable period" value={getPremiumPeriod(selectedPolicy).label} />
-            <SummaryLine label="Coverage period" value={getCoveragePeriod(selectedPolicy).label} />
-            <SummaryLine label="Death" value={formatPolicyCurrency(selectedPolicy.deathBenefit, selectedPolicy.currency)} />
-            <SummaryLine label="TPD" value={formatPolicyCurrency(selectedPolicy.tpdBenefit, selectedPolicy.currency)} />
-            <SummaryLine label="ECI" value={formatPolicyCurrency(selectedPolicy.eciBenefit, selectedPolicy.currency)} />
-            <SummaryLine label="CI" value={formatPolicyCurrency(selectedPolicy.ciBenefit, selectedPolicy.currency)} />
-            <SummaryLine label="Hospitalisation" value={selectedPolicy.hospitalisation || '-'} />
-            <SummaryLine label="Annual premium" value={formatPolicyCurrency(calculatePolicyPremium(selectedPolicy).annual, selectedPolicy.currency)} />
+            <SummaryLine label="Main coverage" value={getCoveragePeriod(selectedPolicy).label} />
+            {getBenefitCoverageDetails(selectedPolicy).map((benefit) => (
+              <SummaryLine
+                key={`${selectedPolicy.id}-${benefit.key}-detail`}
+                label={benefit.label}
+                value={`${benefit.amountDisplay} | ${benefit.periodLabel}`}
+              />
+            ))}
+            <SummaryLine label="Premium" value={formatPolicyTimelinePremium(selectedPolicy)} />
             <SummaryLine label="Notes" value={selectedPolicy.notes || selectedPolicy.remarks || '-'} />
           </div>
         </div>
@@ -623,12 +711,36 @@ function SummaryLine({ label, value, tone }) {
   );
 }
 
+function CurrencyTotalValue({ summary, totalKey, suffix = '', totalsByCurrency }) {
+  const sourceTotals = totalsByCurrency || summary.totalsByCurrency;
+  const values = formatCurrencyTotals(sourceTotals, totalKey, { includeZero: summary.currencies.length <= 1, suffix });
+  return (
+    <span className="currency-total-list">
+      {values.length > 0 ? values.map((value) => <b key={value}>{value}</b>) : <b>-</b>}
+    </span>
+  );
+}
+
 function textValue(value) {
   return value || '-';
 }
 
 function isValidTimelineAge(value) {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function normalizePolicyPremiumFields(policy) {
+  if (policy.premiumPayableType !== 'Fixed term') return policy;
+  const startAge = toLocalNumber(policy.premiumPayableStartAge);
+  const duration = toLocalNumber(policy.premiumPayableDuration);
+  if (startAge === '' || duration === '') return policy;
+  return { ...policy, premiumPayableEndAge: startAge + duration };
+}
+
+function toLocalNumber(value) {
+  if (value === '' || value === null || typeof value === 'undefined') return '';
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : '';
 }
 
 function buildPolicySummaryPdfFilename(clientName, date) {

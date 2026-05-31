@@ -1,33 +1,34 @@
 import {
-  calculatePolicyPremium,
-  formatPolicyCurrency,
+  calculatePolicyTablePremiumTotalsByCurrency,
+  formatCurrencyTotals,
+  formatDisplayDate,
+  formatPolicyCurrencyWithLabel,
+  formatPolicyTimelinePremium,
+  getBenefitCoverageDifferences,
+  getPolicyTablePremiumValues,
   getCoveragePeriod,
   getPremiumPeriod,
 } from '../utils/policySummary.js';
 
 const disclaimer = 'This policy summary is prepared based on information provided and is for discussion purposes only. Please refer to the official policy contracts, benefit illustrations and insurer documents for exact benefits, exclusions, values, terms and conditions.';
+const PDF_POLICY_CHUNK_SIZE = 8;
 
 const exportPolicyRows = [
   { label: 'Company', get: (policy) => textValue(policy.company) },
   { label: 'Policy No.', get: (policy) => textValue(policy.policyNumber) },
   { label: 'Type of Plan', get: (policy) => textValue(policy.typeOfPlan) },
   { label: 'Plan Name', get: (policy) => textValue(policy.planName) },
-  { label: 'Policy Status', get: (policy) => textValue(policy.policyStatus) },
-  { label: 'Pay Status', get: (policy) => textValue(policy.payStatus) },
-  { label: 'Premium Frequency', get: (policy) => textValue(policy.premiumFrequency) },
-  { label: 'Monthly Premium', get: (policy) => formatPolicyCurrency(calculatePolicyPremium(policy).monthly, policy.currency) },
-  { label: 'Annual Premium', get: (policy) => formatPolicyCurrency(calculatePolicyPremium(policy).annual, policy.currency) },
+  { label: 'Policy Start Date', get: (policy) => formatDisplayDate(policy.startDate) },
+  { label: 'Monthly Premium', totalKey: 'monthlyPremium', get: (policy) => getPolicyTablePremiumValues(policy).monthlyDisplay },
+  { label: 'Annual Premium', totalKey: 'annualPremium', get: (policy) => getPolicyTablePremiumValues(policy).annualDisplay },
   { label: 'Premium Payable Period', get: (policy) => getPremiumPeriod(policy).label },
-  { label: 'Coverage Period', get: (policy) => getCoveragePeriod(policy).label },
-  { label: 'Death', highlight: true, get: (policy) => formatPolicyCurrency(policy.deathBenefit, policy.currency) },
-  { label: 'TPD', highlight: true, get: (policy) => formatPolicyCurrency(policy.tpdBenefit, policy.currency) },
-  { label: 'ECI', highlight: true, get: (policy) => formatPolicyCurrency(policy.eciBenefit, policy.currency) },
-  { label: 'CI', highlight: true, get: (policy) => formatPolicyCurrency(policy.ciBenefit, policy.currency) },
+  { label: 'Death', totalKey: 'death', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.deathBenefit, policy.currency) },
+  { label: 'TPD', totalKey: 'tpd', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.tpdBenefit, policy.currency) },
+  { label: 'ECI', totalKey: 'eci', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.eciBenefit, policy.currency) },
+  { label: 'CI', totalKey: 'ci', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.ciBenefit, policy.currency) },
   { label: 'Hospitalisation', highlight: true, get: (policy) => textValue(policy.hospitalisation) },
-  { label: 'Accident', highlight: true, get: (policy) => formatPolicyCurrency(policy.personalAccident, policy.currency) },
-  { label: 'Disability Income', highlight: true, get: (policy) => formatPolicyCurrency(policy.disabilityIncome, policy.currency) },
-  { label: 'Owner', get: (policy) => textValue(policy.owner) },
-  { label: 'Life Assured', get: (policy) => textValue(policy.lifeAssured) },
+  { label: 'Accident', totalKey: 'accident', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.personalAccident, policy.currency) },
+  { label: 'Disability Income', totalKey: 'disabilityIncome', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.disabilityIncome, policy.currency) },
   { label: 'Notes', get: (policy) => textValue(policy.notes || policy.remarks) },
 ];
 
@@ -39,7 +40,8 @@ export function PolicySummaryExportReport({
   benchmark,
   notes,
 }) {
-  const policyChunks = chunkPoliciesForPdf(policies, 4);
+  const policyChunks = chunkPoliciesForPdf(policies, PDF_POLICY_CHUNK_SIZE);
+  const tablePremiumTotalsByCurrency = calculatePolicyTablePremiumTotalsByCurrency(policies);
   const reviewDate = client.reviewDate || new Date().toLocaleDateString('en-CA');
 
   return (
@@ -64,26 +66,26 @@ export function PolicySummaryExportReport({
       <section className="policy-export-summary-grid pdf-avoid-break">
         <section className="policy-export-summary-table">
           <h2>Premium Summary</h2>
-          <SummaryTable rows={[
-            ['Total monthly premium', formatPolicyCurrency(summary.totals.monthlyPremium)],
-            ['Total annual premium', formatPolicyCurrency(summary.totals.annualPremium)],
-            ['Single premium entered', formatPolicyCurrency(summary.totals.singlePremium)],
+          <CurrencySummaryTable summary={summary} rows={[
+            ['Monthly Premium', 'monthlyPremium'],
+            ['Annual Premium', 'annualPremium'],
+            ['Single Premium', 'singlePremium'],
           ]}
           />
         </section>
 
         <section className="policy-export-summary-table">
           <h2>Coverage Summary</h2>
-          <SummaryTable rows={[
-            ['Death', formatPolicyCurrency(summary.totals.death)],
-            ['TPD', formatPolicyCurrency(summary.totals.tpd)],
-            ['ECI', formatPolicyCurrency(summary.totals.eci)],
-            ['CI', formatPolicyCurrency(summary.totals.ci)],
-            ['Hospitalisation', summary.hospitalisationSummary],
-            ['Accident', formatPolicyCurrency(summary.totals.accident)],
-            ['Disability income', formatPolicyCurrency(summary.totals.disabilityIncome)],
+          <CurrencySummaryTable summary={summary} rows={[
+            ['Death', 'death'],
+            ['TPD', 'tpd'],
+            ['ECI', 'eci'],
+            ['CI', 'ci'],
+            ['Accident', 'accident'],
+            ['Disability Income', 'disabilityIncome'],
           ]}
           />
+          <p className="policy-export-hospitalisation">Hospitalisation: {summary.hospitalisationSummary}</p>
         </section>
       </section>
 
@@ -95,22 +97,18 @@ export function PolicySummaryExportReport({
           key={`policy-export-chunk-${index}`}
         >
           <h2>Policy Summary Table {index + 1} of {policyChunks.length}</h2>
-          <PolicySummaryChunkTable policies={chunk} chunkIndex={index} />
+          <PolicySummaryChunkTable
+            policies={chunk}
+            chunkIndex={index}
+            summary={summary}
+            tablePremiumTotalsByCurrency={tablePremiumTotalsByCurrency}
+          />
         </section>
       ))}
 
       <section className="policy-export-summary-table policy-export-gap pdf-avoid-break">
         <h2>Policy Gap Summary</h2>
-        <SummaryTable rows={[
-          ['Annual income benchmark', formatPolicyCurrency(benchmark.annualIncome)],
-          ['Recommended death coverage', formatPolicyCurrency(summary.recommendedDeath)],
-          ['Current death coverage', formatPolicyCurrency(summary.totals.death)],
-          ['Death gap / surplus', formatPolicyCurrency(summary.deathGap), summary.deathGap >= 0 ? 'positive' : 'negative'],
-          ['Recommended CI coverage', formatPolicyCurrency(summary.recommendedCi)],
-          ['Current CI coverage', formatPolicyCurrency(summary.totals.ci)],
-          ['CI gap / surplus', formatPolicyCurrency(summary.ciGap), summary.ciGap >= 0 ? 'positive' : 'negative'],
-        ]}
-        />
+        <GapSummaryTable summary={summary} benchmark={benchmark} />
       </section>
 
       <section className="policy-export-notes pdf-avoid-break">
@@ -122,14 +120,88 @@ export function PolicySummaryExportReport({
   );
 }
 
+function CurrencySummaryTable({ summary, rows }) {
+  const currencies = summary.currencies.length > 0 ? summary.currencies : ['SGD'];
+  const singleCurrency = currencies.length === 1;
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>{singleCurrency ? 'Item' : 'Item'}</th>
+          {singleCurrency ? <th>Amount</th> : currencies.map((currency) => <th key={currency}>{currency}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(([label, key]) => (
+          <tr key={key}>
+            <th>{label}</th>
+            {currencies.map((currency) => (
+              <td key={`${key}-${currency}`}>{formatPolicyCurrencyWithLabel(summary.totalsByCurrency[currency]?.[key] || 0, currency)}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function GapSummaryTable({ summary, benchmark }) {
+  const currencies = summary.currencies.length > 0 ? summary.currencies : [summary.benchmarkCurrency];
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>Currency</th>
+          <th>Death Benchmark / Cover</th>
+          <th>Death Gap</th>
+          <th>CI Benchmark / Cover</th>
+          <th>CI Gap</th>
+        </tr>
+      </thead>
+      <tbody>
+        {currencies.map((currency) => {
+          const gap = summary.gapsByCurrency[currency] || {};
+          return (
+            <tr key={`gap-${currency}`}>
+              <th>{currency}</th>
+              <td>
+                {gap.hasBenchmark
+                  ? `${formatPolicyCurrencyWithLabel(benchmark.annualIncome * benchmark.deathMultiplier, currency)} / ${formatPolicyCurrencyWithLabel(gap.currentDeath, currency)}`
+                  : `No benchmark / ${formatPolicyCurrencyWithLabel(gap.currentDeath || 0, currency)}`}
+              </td>
+              <td className={gap.hasBenchmark && gap.deathGap >= 0 ? 'positive' : gap.hasBenchmark ? 'negative' : ''}>
+                {gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.deathGap, currency) : 'Not combined'}
+              </td>
+              <td>
+                {gap.hasBenchmark
+                  ? `${formatPolicyCurrencyWithLabel(benchmark.annualIncome * benchmark.ciMultiplier, currency)} / ${formatPolicyCurrencyWithLabel(gap.currentCi, currency)}`
+                  : `No benchmark / ${formatPolicyCurrencyWithLabel(gap.currentCi || 0, currency)}`}
+              </td>
+              <td className={gap.hasBenchmark && gap.ciGap >= 0 ? 'positive' : gap.hasBenchmark ? 'negative' : ''}>
+                {gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.ciGap, currency) : 'Not combined'}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 function PolicyTimelinePdf({ policies }) {
   const rows = policies.map((policy) => ({
     policy,
     premium: getPremiumPeriod(policy),
     coverage: getCoveragePeriod(policy),
+    benefitDifferences: getBenefitCoverageDifferences(policy),
     status: getTimelineStatus(policy),
   }));
-  const barPeriods = rows.flatMap((row) => [row.premium, row.coverage]).filter((period) => period.hasBar && isValidAge(period.startAge) && isValidAge(period.endAge));
+  const benefitDifferenceRows = rows.flatMap((row) => row.benefitDifferences.map((period) => ({
+    policyName: row.policy.planName || 'Policy',
+    benefit: period.label,
+    period: period.periodLabel,
+  })));
+  const barPeriods = rows.flatMap((row) => [row.premium, row.coverage, ...row.benefitDifferences]).filter((period) => period.hasBar && isValidAge(period.startAge) && isValidAge(period.endAge));
   const minAge = barPeriods.length > 0
     ? Math.max(0, Math.floor(Math.min(...barPeriods.map((period) => period.startAge)) / 5) * 5)
     : 25;
@@ -138,12 +210,13 @@ function PolicyTimelinePdf({ policies }) {
     : 85;
   const ticks = buildTimelineTicks(minAge, maxAge);
   const width = 1000;
-  const leftWidth = 220;
-  const statusWidth = 78;
+  const leftWidth = 300;
+  const statusWidth = 60;
   const chartX = leftWidth;
   const chartWidth = width - leftWidth - statusWidth - 12;
   const topPad = 34;
-  const rowHeight = rows.length > 12 ? 22 : 24;
+  const hasBenefitBars = rows.some((row) => row.benefitDifferences.length > 0);
+  const rowHeight = hasBenefitBars ? 42 : rows.length > 12 ? 31 : 32;
   const height = topPad + (Math.max(rows.length, 1) * rowHeight) + 24;
   const range = Math.max(1, maxAge - minAge);
   const xForAge = (age) => chartX + (((age - minAge) / range) * chartWidth);
@@ -175,6 +248,7 @@ function PolicyTimelinePdf({ policies }) {
         <div>
           <span><i className="premium" /> Premium payable</span>
           <span><i className="coverage" /> Coverage period</span>
+          <span><i className="benefit" /> Benefit-specific</span>
         </div>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Policy timeline visual">
@@ -190,13 +264,31 @@ function PolicyTimelinePdf({ policies }) {
         })}
         {rows.map((row, index) => {
           const rowY = topPad + (index * rowHeight);
+          const premiumDisplay = formatPolicyTimelinePremium(row.policy);
           return (
             <g key={`timeline-pdf-${row.policy.id}`}>
               <line x1="0" y1={rowY + rowHeight - 3} x2={width} y2={rowY + rowHeight - 3} stroke="#eef2f6" strokeWidth="1" />
-              <text x="0" y={rowY + 8} className="policy-timeline-pdf-name">{truncateText(row.policy.planName || 'Policy', 30)}</text>
-              <text x="0" y={rowY + 18} className="policy-timeline-pdf-company">{truncateText(row.policy.company || row.status || '-', 36)}</text>
+              <text x="0" y={rowY + 7} className="policy-timeline-pdf-name">{truncateText(row.policy.planName || 'Policy', 32)}</text>
+              <text x="0" y={rowY + 15} className="policy-timeline-pdf-company">{truncateText(`${row.policy.company || '-'} | ${row.status || '-'}`, 42)}</text>
+              <text x="0" y={rowY + 23} className="policy-timeline-pdf-company">{truncateText(premiumDisplay, 44)}</text>
+              <text x="145" y={rowY + 23} className="policy-timeline-pdf-company">{truncateText(`Premium: ${row.premium.label}`, 30)}</text>
+              <text x="145" y={rowY + 30} className="policy-timeline-pdf-company">{truncateText(`Coverage: ${row.coverage.label}`, 30)}</text>
               {bar(row.premium, rowY + 3, '#c49a43', 'premium unknown')}
               {bar(row.coverage, rowY + 13, '#102a4c', 'coverage unknown')}
+              {row.benefitDifferences.slice(0, 2).map((period, benefitIndex) => {
+                const x = xForAge(period.startAge);
+                const endX = xForAge(period.endAge);
+                const barWidth = Math.max(7, endX - x);
+                const benefitY = rowY + 24 + (benefitIndex * 7);
+                return (
+                  <g key={`timeline-pdf-${row.policy.id}-${period.key}`}>
+                    <rect x={x} y={benefitY} width={barWidth} height="4" rx="2" fill={benefitIndex === 0 ? '#6f56d9' : '#4f86c6'} />
+                    <text x={Math.min(x + barWidth + 4, chartX + chartWidth - 54)} y={benefitY + 4} className="policy-timeline-pdf-bar-label">
+                      {truncateText(`${period.label}: ${period.periodLabel}`, 26)}
+                    </text>
+                  </g>
+                );
+              })}
               <text x={width - statusWidth + 6} y={rowY + 13} className={`policy-timeline-pdf-status ${getStatusClass(row.policy)}`}>
                 {truncateText(row.status, 16)}
               </text>
@@ -204,11 +296,39 @@ function PolicyTimelinePdf({ policies }) {
           );
         })}
       </svg>
+      {benefitDifferenceRows.length > 0 && (
+        <div className="policy-benefit-differences-pdf">
+          <h3>Benefit Coverage Differences</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Policy</th>
+                <th>Benefit</th>
+                <th>Coverage Period</th>
+              </tr>
+            </thead>
+            <tbody>
+              {benefitDifferenceRows.map((row) => (
+                <tr key={`${row.policyName}-${row.benefit}-${row.period}`}>
+                  <td>{row.policyName}</td>
+                  <td>{row.benefit}</td>
+                  <td>{row.period}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
 
-function PolicySummaryChunkTable({ policies, chunkIndex }) {
+function PolicySummaryChunkTable({
+  policies,
+  chunkIndex,
+  summary,
+  tablePremiumTotalsByCurrency,
+}) {
   return (
     <table className="policy-export-table">
       <thead>
@@ -216,9 +336,10 @@ function PolicySummaryChunkTable({ policies, chunkIndex }) {
           <th>Field</th>
           {policies.map((policy, index) => (
             <th key={`${policy.id}-header`}>
-              {policy.planName || `Policy ${(chunkIndex * 4) + index + 1}`}
+              {policy.planName || `Policy ${(chunkIndex * PDF_POLICY_CHUNK_SIZE) + index + 1}`}
             </th>
           ))}
+          <th className="policy-export-total-column">Total</th>
         </tr>
       </thead>
       <tbody>
@@ -226,6 +347,13 @@ function PolicySummaryChunkTable({ policies, chunkIndex }) {
           <tr key={row.label} className={row.highlight ? 'coverage-row' : ''}>
             <th>{row.label}</th>
             {policies.map((policy) => <td key={`${policy.id}-${row.label}`}>{row.get(policy)}</td>)}
+            <td className="policy-export-total-column">
+              <PdfCurrencyTotalValue
+                row={row}
+                summary={summary}
+                tablePremiumTotalsByCurrency={tablePremiumTotalsByCurrency}
+              />
+            </td>
           </tr>
         ))}
       </tbody>
@@ -233,7 +361,23 @@ function PolicySummaryChunkTable({ policies, chunkIndex }) {
   );
 }
 
-export function chunkPoliciesForPdf(policies, chunkSize = 4) {
+function PdfCurrencyTotalValue({ row, summary, tablePremiumTotalsByCurrency }) {
+  if (!row.totalKey) return '-';
+  const totalsByCurrency = row.label === 'Monthly Premium' || row.label === 'Annual Premium'
+    ? tablePremiumTotalsByCurrency
+    : summary.totalsByCurrency;
+  const values = formatCurrencyTotals(totalsByCurrency, row.totalKey, {
+    includeZero: summary.currencies.length <= 1,
+  });
+  if (values.length === 0) return '-';
+  return (
+    <span className="currency-total-list">
+      {values.map((value) => <b key={`${row.label}-${value}`}>{value}</b>)}
+    </span>
+  );
+}
+
+function chunkPoliciesForPdf(policies, chunkSize = 4) {
   const chunks = [];
   for (let index = 0; index < policies.length; index += chunkSize) {
     chunks.push(policies.slice(index, index + chunkSize));
