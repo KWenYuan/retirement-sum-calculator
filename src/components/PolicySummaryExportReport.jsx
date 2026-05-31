@@ -4,6 +4,7 @@ import {
   formatDisplayDate,
   formatPolicyCurrencyWithLabel,
   formatPolicyTimelinePremium,
+  getBenefitAmountDisplay,
   getBenefitCoverageDifferences,
   getPolicyTablePremiumValues,
   getCoveragePeriod,
@@ -22,14 +23,16 @@ const exportPolicyRows = [
   { label: 'Monthly Premium', totalKey: 'monthlyPremium', get: (policy) => getPolicyTablePremiumValues(policy).monthlyDisplay },
   { label: 'Annual Premium', totalKey: 'annualPremium', get: (policy) => getPolicyTablePremiumValues(policy).annualDisplay },
   { label: 'Premium Payable Period', get: (policy) => getPremiumPeriod(policy).label },
-  { label: 'Death', totalKey: 'death', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.deathBenefit, policy.currency) },
-  { label: 'TPD', totalKey: 'tpd', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.tpdBenefit, policy.currency) },
-  { label: 'ECI', totalKey: 'eci', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.eciBenefit, policy.currency) },
-  { label: 'CI', totalKey: 'ci', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.ciBenefit, policy.currency) },
-  { label: 'Hospitalisation', highlight: true, get: (policy) => textValue(policy.hospitalisation) },
-  { label: 'Accident', totalKey: 'accident', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.personalAccident, policy.currency) },
-  { label: 'Disability Income', totalKey: 'disabilityIncome', highlight: true, get: (policy) => formatPolicyCurrencyWithLabel(policy.disabilityIncome, policy.currency) },
-  { label: 'Notes', get: (policy) => textValue(policy.notes || policy.remarks) },
+  { label: 'Death', totalKey: 'death', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'death') },
+  { label: 'TPD', totalKey: 'tpd', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpd') },
+  { label: 'ECI', totalKey: 'eci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'eci') },
+  { label: 'CI', totalKey: 'ci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'ci') },
+  { label: 'Hospitalisation', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalisation') },
+  { label: 'Disability Income', totalKey: 'disabilityIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'disabilityIncome') },
+  { label: 'Death (Accident)', totalKey: 'deathAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'deathAccident') },
+  { label: 'TPD (Accident)', totalKey: 'tpdAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpdAccident') },
+  { label: 'Medical Reimbursement (Accident)', totalKey: 'medicalReimbursementAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'medicalReimbursementAccident') },
+  { label: 'Hospital Income', totalKey: 'hospitalIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalIncome') },
 ];
 
 export function PolicySummaryExportReport({
@@ -43,6 +46,7 @@ export function PolicySummaryExportReport({
   const policyChunks = chunkPoliciesForPdf(policies, PDF_POLICY_CHUNK_SIZE);
   const tablePremiumTotalsByCurrency = calculatePolicyTablePremiumTotalsByCurrency(policies);
   const reviewDate = client.reviewDate || new Date().toLocaleDateString('en-CA');
+  const displayReviewDate = formatDisplayDate(reviewDate);
 
   return (
     <section className="policy-export-report" ref={refNode}>
@@ -50,16 +54,16 @@ export function PolicySummaryExportReport({
         <div>
           <p>Personal Wealth Planning for</p>
           <h1>{client.clientName || 'Client'}</h1>
-          <span>Current as of {reviewDate}</span>
+          <span>Current as of {displayReviewDate}</span>
           <small>Advisor: {client.advisorName || '-'}</small>
         </div>
         <img src="/logo.png" alt="Advisor logo" />
       </header>
 
       <section className="policy-export-client pdf-avoid-break">
-        <ExportPill label="Date of birth" value={client.dateOfBirth || '-'} />
+        <ExportPill label="Date of birth" value={formatDisplayDate(client.dateOfBirth)} />
         <ExportPill label="Age" value={client.age || '-'} />
-        <ExportPill label="Review date" value={reviewDate} />
+        <ExportPill label="Review date" value={displayReviewDate} />
         <ExportPill label="Policies" value={policies.length} />
       </section>
 
@@ -81,8 +85,11 @@ export function PolicySummaryExportReport({
             ['TPD', 'tpd'],
             ['ECI', 'eci'],
             ['CI', 'ci'],
-            ['Accident', 'accident'],
             ['Disability Income', 'disabilityIncome'],
+            ['Death (Accident)', 'deathAccident'],
+            ['TPD (Accident)', 'tpdAccident'],
+            ['Medical Reimbursement (Accident)', 'medicalReimbursementAccident'],
+            ['Hospital Income', 'hospitalIncome'],
           ]}
           />
           <p className="policy-export-hospitalisation">Hospitalisation: {summary.hospitalisationSummary}</p>
@@ -199,6 +206,7 @@ function PolicyTimelinePdf({ policies }) {
   const benefitDifferenceRows = rows.flatMap((row) => row.benefitDifferences.map((period) => ({
     policyName: row.policy.planName || 'Policy',
     benefit: period.label,
+    amount: period.amountDisplay,
     period: period.periodLabel,
   })));
   const barPeriods = rows.flatMap((row) => [row.premium, row.coverage, ...row.benefitDifferences]).filter((period) => period.hasBar && isValidAge(period.startAge) && isValidAge(period.endAge));
@@ -304,6 +312,7 @@ function PolicyTimelinePdf({ policies }) {
               <tr>
                 <th>Policy</th>
                 <th>Benefit</th>
+                <th>Amount</th>
                 <th>Coverage Period</th>
               </tr>
             </thead>
@@ -312,6 +321,7 @@ function PolicyTimelinePdf({ policies }) {
                 <tr key={`${row.policyName}-${row.benefit}-${row.period}`}>
                   <td>{row.policyName}</td>
                   <td>{row.benefit}</td>
+                  <td>{row.amount}</td>
                   <td>{row.period}</td>
                 </tr>
               ))}

@@ -52,8 +52,11 @@ const numberFields = [
   'tpdBenefit',
   'eciBenefit',
   'ciBenefit',
-  'personalAccident',
   'disabilityIncome',
+  'deathAccidentBenefit',
+  'tpdAccidentBenefit',
+  'medicalReimbursementAccident',
+  'hospitalIncome',
   'cashValue',
   'surrenderValue',
   'investmentValue',
@@ -84,13 +87,16 @@ export const benefitCoverageDefinitions = [
   { key: 'eci', label: 'ECI', amountField: 'eciBenefit', type: 'currency' },
   { key: 'ci', label: 'CI', amountField: 'ciBenefit', type: 'currency' },
   { key: 'hospitalisation', label: 'Hospitalisation', amountField: 'hospitalisation', type: 'text' },
-  { key: 'accident', label: 'Accident', amountField: 'personalAccident', type: 'currency' },
   { key: 'disabilityIncome', label: 'Disability income', amountField: 'disabilityIncome', type: 'currency' },
+  { key: 'deathAccident', label: 'Death (Accident)', amountField: 'deathAccidentBenefit', type: 'currency' },
+  { key: 'tpdAccident', label: 'TPD (Accident)', amountField: 'tpdAccidentBenefit', type: 'currency' },
+  { key: 'medicalReimbursementAccident', label: 'Medical Reimbursement (Accident)', amountField: 'medicalReimbursementAccident', type: 'currency' },
+  { key: 'hospitalIncome', label: 'Hospital Income', amountField: 'hospitalIncome', type: 'currency' },
 ];
 
 export const defaultBenefitCoveragePeriods = benefitCoverageDefinitions.reduce((items, definition) => ({
   ...items,
-  [definition.key]: { startAge: '', endAge: '' },
+  [definition.key]: { amount: '', startAge: '', endAge: '' },
 }), {});
 
 const createBasePolicySummaryPolicy = (overrides = {}) => ({
@@ -118,8 +124,11 @@ const createBasePolicySummaryPolicy = (overrides = {}) => ({
   eciBenefit: 0,
   ciBenefit: 0,
   hospitalisation: '',
-  personalAccident: 0,
   disabilityIncome: 0,
+  deathAccidentBenefit: 0,
+  tpdAccidentBenefit: 0,
+  medicalReimbursementAccident: 0,
+  hospitalIncome: 0,
   otherBenefits: '',
   coverageStartAge: '',
   coverageEndAge: '',
@@ -137,6 +146,7 @@ const createBasePolicySummaryPolicy = (overrides = {}) => ({
   beneficiaryStatus: '',
   assignmentStatus: '',
   notes: '',
+  benefits: defaultBenefitCoveragePeriods,
   benefitCoveragePeriods: defaultBenefitCoveragePeriods,
   ...overrides,
 });
@@ -209,7 +219,15 @@ function normalizePolicySummaryPolicyWithReport(policy = {}, index = 0) {
     payStatusOptions,
     'Unknown',
   );
-  normalized.benefitCoveragePeriods = normalizeBenefitCoveragePeriods(source.benefitCoveragePeriods);
+  normalized.benefits = normalizeBenefits(source.benefits, normalized, source.benefitCoveragePeriods);
+  normalized.benefitCoveragePeriods = normalized.benefits;
+  benefitCoverageDefinitions.forEach((definition) => {
+    if (definition.type === 'text') {
+      normalized[definition.amountField] = toSafeText(normalized.benefits[definition.key]?.amount);
+    } else {
+      normalized[definition.amountField] = toNumber(normalized.benefits[definition.key]?.amount);
+    }
+  });
 
   ['premiumFrequency', 'premiumPayableType', 'coverageType', 'policyStatus', 'coverageStatus', 'payStatus'].forEach((field) => {
     if (source[field] && normalized[field] === 'Unknown' && source[field] !== 'Unknown') cleanedFields.push(field);
@@ -307,8 +325,11 @@ export function calculatePolicySummary(policies = [], benchmark = defaultPolicyB
         tpd: 0,
         eci: 0,
         ci: 0,
-        accident: 0,
         disabilityIncome: 0,
+        deathAccident: 0,
+        tpdAccident: 0,
+        medicalReimbursementAccident: 0,
+        hospitalIncome: 0,
       };
     }
     return totalsByCurrency[currency];
@@ -321,23 +342,29 @@ export function calculatePolicySummary(policies = [], benchmark = defaultPolicyB
     currencyTotals.monthlyPremium += premium.monthly;
     currencyTotals.annualPremium += premium.annual;
     currencyTotals.singlePremium += premium.single;
-    currencyTotals.death += toNumber(policy?.deathBenefit);
-    currencyTotals.tpd += toNumber(policy?.tpdBenefit);
-    currencyTotals.eci += toNumber(policy?.eciBenefit);
-    currencyTotals.ci += toNumber(policy?.ciBenefit);
-    currencyTotals.accident += toNumber(policy?.personalAccident);
-    currencyTotals.disabilityIncome += toNumber(policy?.disabilityIncome);
+    currencyTotals.death += getBenefitAmountNumber(policy, 'death');
+    currencyTotals.tpd += getBenefitAmountNumber(policy, 'tpd');
+    currencyTotals.eci += getBenefitAmountNumber(policy, 'eci');
+    currencyTotals.ci += getBenefitAmountNumber(policy, 'ci');
+    currencyTotals.disabilityIncome += getBenefitAmountNumber(policy, 'disabilityIncome');
+    currencyTotals.deathAccident += getBenefitAmountNumber(policy, 'deathAccident');
+    currencyTotals.tpdAccident += getBenefitAmountNumber(policy, 'tpdAccident');
+    currencyTotals.medicalReimbursementAccident += getBenefitAmountNumber(policy, 'medicalReimbursementAccident');
+    currencyTotals.hospitalIncome += getBenefitAmountNumber(policy, 'hospitalIncome');
 
     return {
       monthlyPremium: items.monthlyPremium + premium.monthly,
       annualPremium: items.annualPremium + premium.annual,
       singlePremium: items.singlePremium + premium.single,
-      death: items.death + toNumber(policy?.deathBenefit),
-      tpd: items.tpd + toNumber(policy?.tpdBenefit),
-      eci: items.eci + toNumber(policy?.eciBenefit),
-      ci: items.ci + toNumber(policy?.ciBenefit),
-      accident: items.accident + toNumber(policy?.personalAccident),
-      disabilityIncome: items.disabilityIncome + toNumber(policy?.disabilityIncome),
+      death: items.death + getBenefitAmountNumber(policy, 'death'),
+      tpd: items.tpd + getBenefitAmountNumber(policy, 'tpd'),
+      eci: items.eci + getBenefitAmountNumber(policy, 'eci'),
+      ci: items.ci + getBenefitAmountNumber(policy, 'ci'),
+      disabilityIncome: items.disabilityIncome + getBenefitAmountNumber(policy, 'disabilityIncome'),
+      deathAccident: items.deathAccident + getBenefitAmountNumber(policy, 'deathAccident'),
+      tpdAccident: items.tpdAccident + getBenefitAmountNumber(policy, 'tpdAccident'),
+      medicalReimbursementAccident: items.medicalReimbursementAccident + getBenefitAmountNumber(policy, 'medicalReimbursementAccident'),
+      hospitalIncome: items.hospitalIncome + getBenefitAmountNumber(policy, 'hospitalIncome'),
     };
   }, {
     monthlyPremium: 0,
@@ -347,12 +374,15 @@ export function calculatePolicySummary(policies = [], benchmark = defaultPolicyB
     tpd: 0,
     eci: 0,
     ci: 0,
-    accident: 0,
     disabilityIncome: 0,
+    deathAccident: 0,
+    tpdAccident: 0,
+    medicalReimbursementAccident: 0,
+    hospitalIncome: 0,
   });
 
   const hospitalPlans = policies
-    .map((policy) => toSafeText(policy?.hospitalisation))
+    .map((policy) => toSafeText(getBenefitAmount(policy, 'hospitalisation')))
     .filter(Boolean);
   const hospitalisationSummary = hospitalPlans.length > 0
     ? hospitalPlans.join(', ')
@@ -455,6 +485,20 @@ export function getBenefitCoverageDetails(policy) {
       hasBar: false,
       differsFromMain: false,
     });
+}
+
+export function getBenefitAmount(policy, benefitKey) {
+  const definition = benefitCoverageDefinitions.find((benefit) => benefit.key === benefitKey);
+  if (!definition) return '';
+  const periodAmount = policy?.benefits?.[benefitKey]?.amount ?? policy?.benefitCoveragePeriods?.[benefitKey]?.amount;
+  if (periodAmount !== '' && periodAmount !== null && typeof periodAmount !== 'undefined') return periodAmount;
+  return policy?.[definition.amountField] ?? '';
+}
+
+export function getBenefitAmountDisplay(policy, benefitKey) {
+  const definition = benefitCoverageDefinitions.find((benefit) => benefit.key === benefitKey);
+  if (!definition) return '-';
+  return formatBenefitAmount(policy, definition);
 }
 
 export function formatDisplayDate(value) {
@@ -684,15 +728,27 @@ function unknownCoveragePeriod() {
   return { label: 'Coverage period unknown', startAge: '', endAge: '', hasBar: false };
 }
 
-function normalizeBenefitCoveragePeriods(periods = {}) {
+function normalizeBenefits(periods = {}, policy = {}, legacyPeriods = {}) {
   const source = isPlainObject(periods) ? periods : {};
+  const legacySource = isPlainObject(legacyPeriods) ? legacyPeriods : {};
   return benefitCoverageDefinitions.reduce((items, definition) => {
     const period = isPlainObject(source[definition.key]) ? source[definition.key] : {};
+    const legacyPeriod = isPlainObject(legacySource[definition.key]) ? legacySource[definition.key] : {};
+    const periodAmount = period.amount ?? period.value;
+    const legacyAmount = legacyPeriod.amount ?? legacyPeriod.value;
+    const sourceAmount = periodAmount !== '' && periodAmount !== null && typeof periodAmount !== 'undefined'
+      ? periodAmount
+      : legacyAmount !== '' && legacyAmount !== null && typeof legacyAmount !== 'undefined'
+        ? legacyAmount
+        : policy[definition.amountField];
+    const startAge = toOptionalNumber(period.startAge) !== '' ? toOptionalNumber(period.startAge) : toOptionalNumber(legacyPeriod.startAge);
+    const endAge = toOptionalNumber(period.endAge) !== '' ? toOptionalNumber(period.endAge) : toOptionalNumber(legacyPeriod.endAge);
     return {
       ...items,
       [definition.key]: {
-        startAge: toOptionalNumber(period.startAge),
-        endAge: toOptionalNumber(period.endAge),
+        amount: normalizeBenefitAmount(sourceAmount, definition),
+        startAge,
+        endAge,
       },
     };
   }, {});
@@ -700,7 +756,7 @@ function normalizeBenefitCoveragePeriods(periods = {}) {
 
 function getBenefitCoveragePeriod(policy, definition, mainCoverage) {
   if (!hasBenefitValue(policy, definition)) return null;
-  const rawPeriod = policy?.benefitCoveragePeriods?.[definition.key] || {};
+  const rawPeriod = policy?.benefits?.[definition.key] || policy?.benefitCoveragePeriods?.[definition.key] || {};
   const startAge = toOptionalNumber(rawPeriod.startAge);
   const endAge = toOptionalNumber(rawPeriod.endAge);
   const hasSpecificPeriod = hasValidAge(startAge) && hasValidAge(endAge);
@@ -723,13 +779,26 @@ function getBenefitCoveragePeriod(policy, definition, mainCoverage) {
 }
 
 function hasBenefitValue(policy, definition) {
-  if (definition.type === 'text') return Boolean(toSafeText(policy?.[definition.amountField]).trim());
-  return toNumber(policy?.[definition.amountField]) > 0;
+  const amount = getBenefitAmount(policy, definition.key);
+  if (definition.type === 'text') return Boolean(toSafeText(amount).trim());
+  return toNumber(amount) > 0;
 }
 
 function formatBenefitAmount(policy, definition) {
-  if (definition.type === 'text') return toSafeText(policy?.[definition.amountField]).trim() || '-';
-  return formatPolicyCurrency(policy?.[definition.amountField], policy?.currency);
+  const amount = getBenefitAmount(policy, definition.key);
+  if (definition.type === 'text') return toSafeText(amount).trim() || '-';
+  return formatPolicyCurrency(amount, policy?.currency);
+}
+
+function getBenefitAmountNumber(policy, benefitKey) {
+  return toNumber(getBenefitAmount(policy, benefitKey));
+}
+
+function normalizeBenefitAmount(value, definition) {
+  if (definition.type === 'text') return toSafeText(value);
+  if (value === '' || value === null || typeof value === 'undefined') return '';
+  const parsed = parseFiniteNumber(value);
+  return typeof parsed === 'number' ? parsed : '';
 }
 
 function parseDisplayDate(text) {

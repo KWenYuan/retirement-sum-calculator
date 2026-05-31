@@ -18,6 +18,7 @@ import {
   formatPolicyCurrency,
   formatPolicyCurrencyWithLabel,
   formatPolicyTimelinePremium,
+  getBenefitAmountDisplay,
   getBenefitCoverageDetails,
   getBenefitCoverageDifferences,
   getPolicyTablePremiumValues,
@@ -47,14 +48,16 @@ const policyRows = [
   { label: 'Monthly Premium', totalKey: 'monthlyPremium', premiumTableTotal: true, get: (policy) => getPolicyTablePremiumValues(policy).monthlyDisplay },
   { label: 'Annual Premium', totalKey: 'annualPremium', premiumTableTotal: true, get: (policy) => getPolicyTablePremiumValues(policy).annualDisplay },
   { label: 'Premium Payable Period', get: (policy) => getPremiumPeriod(policy).label },
-  { label: 'Death', totalKey: 'death', highlight: true, get: (policy) => formatPolicyCurrency(policy.deathBenefit, policy.currency) },
-  { label: 'TPD', totalKey: 'tpd', highlight: true, get: (policy) => formatPolicyCurrency(policy.tpdBenefit, policy.currency) },
-  { label: 'ECI', totalKey: 'eci', highlight: true, get: (policy) => formatPolicyCurrency(policy.eciBenefit, policy.currency) },
-  { label: 'CI', totalKey: 'ci', highlight: true, get: (policy) => formatPolicyCurrency(policy.ciBenefit, policy.currency) },
-  { label: 'Hospitalisation', highlight: true, get: (policy) => textValue(policy.hospitalisation) },
-  { label: 'Accident', totalKey: 'accident', highlight: true, get: (policy) => formatPolicyCurrency(policy.personalAccident, policy.currency) },
-  { label: 'Disability Income', totalKey: 'disabilityIncome', highlight: true, get: (policy) => formatPolicyCurrency(policy.disabilityIncome, policy.currency) },
-  { label: 'Notes', get: (policy) => textValue(policy.notes || policy.remarks) },
+  { label: 'Death', totalKey: 'death', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'death') },
+  { label: 'TPD', totalKey: 'tpd', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpd') },
+  { label: 'ECI', totalKey: 'eci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'eci') },
+  { label: 'CI', totalKey: 'ci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'ci') },
+  { label: 'Hospitalisation', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalisation') },
+  { label: 'Disability Income', totalKey: 'disabilityIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'disabilityIncome') },
+  { label: 'Death (Accident)', totalKey: 'deathAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'deathAccident') },
+  { label: 'TPD (Accident)', totalKey: 'tpdAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpdAccident') },
+  { label: 'Medical Reimbursement (Accident)', totalKey: 'medicalReimbursementAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'medicalReimbursementAccident') },
+  { label: 'Hospital Income', totalKey: 'hospitalIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalIncome') },
 ];
 
 export function PolicySummary({ viewMode = 'advisor' }) {
@@ -88,7 +91,7 @@ export function PolicySummary({ viewMode = 'advisor' }) {
 
   const updatePolicy = (id, key, value) => {
     setPolicies((current) => current.map((policy) => (
-      policy.id === id ? normalizePolicyPremiumFields({ ...policy, [key]: value }) : policy
+      policy.id === id ? normalizePolicyPremiumFields({ ...policy, [key]: value }, key) : policy
     )));
   };
 
@@ -160,7 +163,7 @@ export function PolicySummary({ viewMode = 'advisor' }) {
         <div>
           <p>Personal Wealth Planning</p>
           <h1>Policy Summary for {client.clientName || 'Client'}</h1>
-          <span>Current as of {client.reviewDate || exportDate}</span>
+          <span>Current as of {formatDisplayDate(client.reviewDate || exportDate)}</span>
         </div>
         <div className="policy-summary-actions">
           <button className="export-button" type="button" onClick={exportPdf} disabled={isExporting}>
@@ -267,10 +270,11 @@ export function PolicySummary({ viewMode = 'advisor' }) {
 function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePolicy, deletePolicy }) {
   const premium = calculatePolicyPremium(policy);
   const updateBenefitCoverage = (benefitKey, field, value) => {
-    updatePolicy(policy.id, 'benefitCoveragePeriods', {
-      ...(policy.benefitCoveragePeriods || {}),
+    const benefit = benefitCoverageDefinitions.find((item) => item.key === benefitKey);
+    updatePolicy(policy.id, 'benefits', {
+      ...(policy.benefits || policy.benefitCoveragePeriods || {}),
       [benefitKey]: {
-        ...(policy.benefitCoveragePeriods?.[benefitKey] || {}),
+        ...(policy.benefits?.[benefitKey] || policy.benefitCoveragePeriods?.[benefitKey] || {}),
         [field]: value,
       },
     });
@@ -283,7 +287,7 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
           <span>Company: {textValue(policy.company)}</span>
           <span>Type: {textValue(policy.typeOfPlan)}</span>
           <span>Premium: {formatPolicyTimelinePremium(policy)}</span>
-          <span>Death: {formatPolicyCurrency(policy.deathBenefit, policy.currency)} | CI: {formatPolicyCurrency(policy.ciBenefit, policy.currency)}</span>
+          <span>Death: {getBenefitAmountDisplay(policy, 'death')} | CI: {getBenefitAmountDisplay(policy, 'ci')}</span>
         </div>
         <div className="compact-item-value">
           <span>Annual</span>
@@ -308,8 +312,6 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
               <TextField label="Start date" value={policy.startDate} onChange={(value) => updatePolicy(policy.id, 'startDate', value)} />
               <NumberField label="Policy start age" value={policy.ageInception} onChange={(value) => updatePolicy(policy.id, 'ageInception', value)} />
               <TextField label="Currency" value={policy.currency} onChange={(value) => updatePolicy(policy.id, 'currency', value)} />
-              <TextField label="Owner" value={policy.owner} onChange={(value) => updatePolicy(policy.id, 'owner', value)} />
-              <TextField label="Life assured" value={policy.lifeAssured} onChange={(value) => updatePolicy(policy.id, 'lifeAssured', value)} />
             </div>
           </details>
           <details className="advanced-block" open>
@@ -343,64 +345,58 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
                   <NumberField label="Paid-up age (optional)" value={policy.premiumPayableEndAge} onChange={(value) => updatePolicy(policy.id, 'premiumPayableEndAge', value)} />
                 </>
               )}
-              <TextField label="Payment term" value={policy.paymentTerm} onChange={(value) => updatePolicy(policy.id, 'paymentTerm', value)} />
               <SelectField label="Pay status" value={policy.payStatus} onChange={(value) => updatePolicy(policy.id, 'payStatus', value)} options={payStatuses} />
             </div>
           </details>
           <details className="advanced-block" open>
             <summary>Coverage Details</summary>
-            <div className="form-grid compact input-compact-grid">
-              <NumberField label="Death benefit" prefix="$" value={policy.deathBenefit} onChange={(value) => updatePolicy(policy.id, 'deathBenefit', value)} />
-              <NumberField label="TPD benefit" prefix="$" value={policy.tpdBenefit} onChange={(value) => updatePolicy(policy.id, 'tpdBenefit', value)} />
-              <NumberField label="Early CI" prefix="$" value={policy.eciBenefit} onChange={(value) => updatePolicy(policy.id, 'eciBenefit', value)} />
-              <NumberField label="Critical illness" prefix="$" value={policy.ciBenefit} onChange={(value) => updatePolicy(policy.id, 'ciBenefit', value)} />
-              <TextField label="Hospitalisation" value={policy.hospitalisation} onChange={(value) => updatePolicy(policy.id, 'hospitalisation', value)} />
-              <NumberField label="Personal accident" prefix="$" value={policy.personalAccident} onChange={(value) => updatePolicy(policy.id, 'personalAccident', value)} />
-              <NumberField label="Disability income" prefix="$" value={policy.disabilityIncome} onChange={(value) => updatePolicy(policy.id, 'disabilityIncome', value)} />
-              <TextField label="Other benefits" value={policy.otherBenefits} onChange={(value) => updatePolicy(policy.id, 'otherBenefits', value)} />
-              <TextField label="Waiver rider" value={policy.waiverRider} onChange={(value) => updatePolicy(policy.id, 'waiverRider', value)} />
-              <NumberField label="Coverage start age" value={policy.coverageStartAge} onChange={(value) => updatePolicy(policy.id, 'coverageStartAge', value)} />
-              <NumberField label="Coverage end age" value={policy.coverageEndAge} onChange={(value) => updatePolicy(policy.id, 'coverageEndAge', value)} />
-              <NumberField label="Coverage duration" suffix="years" value={policy.coverageDuration} onChange={(value) => updatePolicy(policy.id, 'coverageDuration', value)} />
-              <SelectField label="Coverage type" value={policy.coverageType} onChange={(value) => updatePolicy(policy.id, 'coverageType', value)} options={coverageTypes} />
-              <SelectField label="Coverage status" value={policy.coverageStatus} onChange={(value) => updatePolicy(policy.id, 'coverageStatus', value)} options={coverageStatuses} />
-            </div>
-            <details className="benefit-coverage-block">
-              <summary>Benefit Coverage Periods</summary>
-              <p>Use this only when a specific benefit ends earlier or later than the main policy coverage period.</p>
+            <div className="coverage-details-layout">
+              <p>Enter each benefit amount and its coverage ages here. These rows drive the summary table, coverage totals, timeline, PDF and JSON export.</p>
               <div className="benefit-coverage-grid">
                 <span>Benefit</span>
+                <span>Amount</span>
                 <span>Start age</span>
                 <span>End age</span>
                 {benefitCoverageDefinitions.map((benefit) => (
                   <div className="benefit-coverage-row" key={benefit.key}>
                     <strong>{benefit.label}</strong>
+                    {benefit.type === 'text' ? (
+                      <TextField
+                        label={`${benefit.label} amount`}
+                        value={policy.benefits?.[benefit.key]?.amount ?? policy.benefitCoveragePeriods?.[benefit.key]?.amount ?? policy[benefit.amountField] ?? ''}
+                        onChange={(value) => updateBenefitCoverage(benefit.key, 'amount', value)}
+                      />
+                    ) : (
+                      <NumberField
+                        label={`${benefit.label} amount`}
+                        prefix="$"
+                        value={policy.benefits?.[benefit.key]?.amount ?? policy.benefitCoveragePeriods?.[benefit.key]?.amount ?? policy[benefit.amountField] ?? ''}
+                        onChange={(value) => updateBenefitCoverage(benefit.key, 'amount', value)}
+                      />
+                    )}
                     <NumberField
                       label={`${benefit.label} start age`}
-                      value={policy.benefitCoveragePeriods?.[benefit.key]?.startAge ?? ''}
+                      value={policy.benefits?.[benefit.key]?.startAge ?? policy.benefitCoveragePeriods?.[benefit.key]?.startAge ?? ''}
                       onChange={(value) => updateBenefitCoverage(benefit.key, 'startAge', value)}
                     />
                     <NumberField
                       label={`${benefit.label} end age`}
-                      value={policy.benefitCoveragePeriods?.[benefit.key]?.endAge ?? ''}
+                      value={policy.benefits?.[benefit.key]?.endAge ?? policy.benefitCoveragePeriods?.[benefit.key]?.endAge ?? ''}
                       onChange={(value) => updateBenefitCoverage(benefit.key, 'endAge', value)}
                     />
                   </div>
                 ))}
               </div>
-            </details>
+              <div className="form-grid compact input-compact-grid">
+                <TextField label="Other benefits" value={policy.otherBenefits} onChange={(value) => updatePolicy(policy.id, 'otherBenefits', value)} />
+                <SelectField label="Coverage type" value={policy.coverageType} onChange={(value) => updatePolicy(policy.id, 'coverageType', value)} options={coverageTypes} />
+              </div>
+            </div>
           </details>
           <details className="advanced-block">
             <summary>Policy Values</summary>
             <div className="form-grid compact input-compact-grid">
               <NumberField label="Cash value" prefix="$" value={policy.cashValue} onChange={(value) => updatePolicy(policy.id, 'cashValue', value)} />
-            </div>
-          </details>
-          <details className="advanced-block">
-            <summary>Notes / Estate / Admin</summary>
-            <div className="form-grid compact input-compact-grid">
-              <TextField label="Remarks" value={policy.remarks} onChange={(value) => updatePolicy(policy.id, 'remarks', value)} />
-              <TextField label="Notes" value={policy.notes} onChange={(value) => updatePolicy(policy.id, 'notes', value)} />
             </div>
           </details>
         </div>
@@ -416,16 +412,16 @@ function PolicySummaryReport({ client, policies, summary, benchmark, notes, sele
         <div>
           <p>Personal Wealth Planning for</p>
           <h2>{client.clientName || 'Client'}</h2>
-          <span>Current as of {client.reviewDate || new Date().toLocaleDateString('en-CA')}</span>
+          <span>Current as of {formatDisplayDate(client.reviewDate || new Date().toLocaleDateString('en-CA'))}</span>
           <small>Advisor: {client.advisorName || '-'}</small>
         </div>
         <img src="/logo.png" alt="Advisor logo" />
       </header>
 
       <div className="policy-client-strip avoid-break">
-        <SummaryPill label="Date of birth" value={client.dateOfBirth || '-'} />
+        <SummaryPill label="Date of birth" value={formatDisplayDate(client.dateOfBirth)} />
         <SummaryPill label="Age" value={client.age || '-'} />
-        <SummaryPill label="Review date" value={client.reviewDate || '-'} />
+        <SummaryPill label="Review date" value={formatDisplayDate(client.reviewDate)} />
         <SummaryPill label="Policies" value={policies.length} />
       </div>
 
@@ -454,8 +450,11 @@ function PolicySummaryReport({ client, policies, summary, benchmark, notes, sele
           <SummaryLine label="ECI" value={<CurrencyTotalValue summary={summary} totalKey="eci" />} />
           <SummaryLine label="CI" value={<CurrencyTotalValue summary={summary} totalKey="ci" />} />
           <SummaryLine label="Hospitalisation" value={summary.hospitalisationSummary} />
-          <SummaryLine label="Accident" value={<CurrencyTotalValue summary={summary} totalKey="accident" />} />
           <SummaryLine label="Disability income" value={<CurrencyTotalValue summary={summary} totalKey="disabilityIncome" />} />
+          <SummaryLine label="Death (Accident)" value={<CurrencyTotalValue summary={summary} totalKey="deathAccident" />} />
+          <SummaryLine label="TPD (Accident)" value={<CurrencyTotalValue summary={summary} totalKey="tpdAccident" />} />
+          <SummaryLine label="Medical reimbursement" value={<CurrencyTotalValue summary={summary} totalKey="medicalReimbursementAccident" />} />
+          <SummaryLine label="Hospital income" value={<CurrencyTotalValue summary={summary} totalKey="hospitalIncome" />} />
         </section>
 
         <section className="policy-mini-panel avoid-break">
@@ -630,7 +629,6 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
               />
             ))}
             <SummaryLine label="Premium" value={formatPolicyTimelinePremium(selectedPolicy)} />
-            <SummaryLine label="Notes" value={selectedPolicy.notes || selectedPolicy.remarks || '-'} />
           </div>
         </div>
       )}
@@ -729,12 +727,30 @@ function isValidTimelineAge(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-function normalizePolicyPremiumFields(policy) {
-  if (policy.premiumPayableType !== 'Fixed term') return policy;
-  const startAge = toLocalNumber(policy.premiumPayableStartAge);
-  const duration = toLocalNumber(policy.premiumPayableDuration);
-  if (startAge === '' || duration === '') return policy;
-  return { ...policy, premiumPayableEndAge: startAge + duration };
+function normalizePolicyPremiumFields(policy, updatedKey = '') {
+  const benefit = benefitCoverageDefinitions.find((item) => item.amountField === updatedKey);
+  const syncedPolicy = benefit ? {
+    ...policy,
+    benefits: {
+      ...(policy.benefits || {}),
+      [benefit.key]: {
+        ...(policy.benefits?.[benefit.key] || {}),
+        amount: policy[benefit.amountField],
+      },
+    },
+    benefitCoveragePeriods: {
+      ...(policy.benefitCoveragePeriods || {}),
+      [benefit.key]: {
+        ...(policy.benefitCoveragePeriods?.[benefit.key] || {}),
+        amount: policy[benefit.amountField],
+      },
+    },
+  } : policy;
+  if (syncedPolicy.premiumPayableType !== 'Fixed term') return syncedPolicy;
+  const startAge = toLocalNumber(syncedPolicy.premiumPayableStartAge);
+  const duration = toLocalNumber(syncedPolicy.premiumPayableDuration);
+  if (startAge === '' || duration === '') return syncedPolicy;
+  return { ...syncedPolicy, premiumPayableEndAge: startAge + duration };
 }
 
 function toLocalNumber(value) {
