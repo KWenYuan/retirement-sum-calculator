@@ -5,6 +5,7 @@ import { Dashboard } from './components/Dashboard.jsx';
 import { AnnualReview } from './components/AnnualReview.jsx';
 import { ExportReport } from './components/ExportReport.jsx';
 import { FollowUpTasks } from './components/FollowUpTasks.jsx';
+import { PolicySummary } from './components/PolicySummary.jsx';
 import { RetirementIncomeSources } from './components/RetirementIncomeSources.jsx';
 import { RetirementTimeline } from './components/RetirementTimeline.jsx';
 import {
@@ -60,6 +61,7 @@ const VIEW_MODE_STORAGE_KEY = 'retirementProjectionViewMode';
 
 export default function App() {
   const savedState = useMemo(() => loadClientDataFromStorage(), []);
+  const [appPage, setAppPage] = useState('retirement');
   const [viewMode, setViewMode] = useState(() => loadViewMode());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [profile, setProfile] = useState(savedState?.profile || defaultProfile);
@@ -278,6 +280,8 @@ export default function App() {
   return (
     <div className={`app-shell ${viewMode}-mode`}>
       <ModeToolbar
+        appPage={appPage}
+        setAppPage={setAppPage}
         viewMode={viewMode}
         setViewMode={setViewMode}
         exportPdf={exportPdf}
@@ -286,6 +290,10 @@ export default function App() {
         isFullscreen={isFullscreen}
       />
 
+      {appPage === 'policy-summary' ? (
+        <PolicySummary viewMode={viewMode} />
+      ) : (
+      <>
       <div className={`app ${viewMode === 'presentation' ? 'presentation-app' : ''}`}>
         {viewMode === 'advisor' && (
           <aside className="sidebar">
@@ -443,6 +451,8 @@ export default function App() {
         accept="application/json,.json"
         onChange={handleImportPreviousReviewData}
       />
+      </>
+      )}
     </div>
   );
 }
@@ -464,15 +474,32 @@ function saveViewMode(viewMode) {
   }
 }
 
-function ModeToolbar({ viewMode, setViewMode, exportPdf, isExporting, toggleFullscreen, isFullscreen }) {
+function ModeToolbar({ appPage, setAppPage, viewMode, setViewMode, exportPdf, isExporting, toggleFullscreen, isFullscreen }) {
   const isPresentation = viewMode === 'presentation';
+  const isRetirementPage = appPage === 'retirement';
   return (
     <header className="mode-toolbar">
       <div className="mode-toolbar-title">
-        <strong>Retirement Projection Studio</strong>
+        <strong>{isRetirementPage ? 'Retirement Projection Studio' : 'Policy Summary'}</strong>
         <span>{isPresentation ? 'Client presentation dashboard' : 'Advisor workspace'}</span>
       </div>
       <div className="mode-toolbar-actions">
+        <div className="page-toggle" aria-label="App page">
+          <button
+            type="button"
+            className={isRetirementPage ? 'active' : ''}
+            onClick={() => setAppPage('retirement')}
+          >
+            Retirement Projection
+          </button>
+          <button
+            type="button"
+            className={appPage === 'policy-summary' ? 'active' : ''}
+            onClick={() => setAppPage('policy-summary')}
+          >
+            Policy Summary
+          </button>
+        </div>
         <div className="mode-toggle" aria-label="View mode">
           <button
             type="button"
@@ -489,7 +516,7 @@ function ModeToolbar({ viewMode, setViewMode, exportPdf, isExporting, toggleFull
             Presentation Mode
           </button>
         </div>
-        {isPresentation && (
+        {isPresentation && isRetirementPage && (
           <>
             <button className="ghost-button mode-action" type="button" onClick={() => setViewMode('advisor')}>
               Edit Details
