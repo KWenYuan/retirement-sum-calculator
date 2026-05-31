@@ -207,17 +207,18 @@ export function ExportReport({
       <section className="export-section avoid-break">
         <h2>Policy Maturity / Withdrawal Milestones</h2>
         <SimpleTable
-          headers={['Policy', 'Premium commitment', 'Premium period', 'Holding until', 'Withdrawal strategy', 'Projected value']}
+          headers={['Policy', 'Structure', 'Premium commitment', 'Premium period', 'Compounding period after premium', 'Withdrawal strategy', 'Projected value']}
           rows={policies.map((policy) => {
             const structure = getPolicyStructure(policy, asNumber(profile.retirementAge));
-            const projectedValue = projectPolicyAccumulatedAtAge(policy, asNumber(profile.currentAge), structure.withdrawalStartAge || structure.holdingUntilAge, scenarioRate);
+            const projectedValue = projectPolicyAccumulatedAtAge(policy, asNumber(profile.currentAge), structure.withdrawalStartAge, scenarioRate);
             return [
               policy.name || 'Policy',
+              policy.policyStructure || 'Custom',
               policy.continuePremiumsAfterCommitment
                 ? `${formatCurrency(policy.premiumAmount)}/${policy.premiumFrequency || 'month'} until age ${structure.premiumEndAge}`
                 : `${formatCurrency(policy.premiumAmount)}/${policy.premiumFrequency || 'month'} for ${structure.premiumCommitmentTerm} years`,
               `Age ${structure.startAge}-${structure.premiumEndAge}`,
-              `Age ${structure.holdingUntilAge}`,
+              structure.withdrawalStartAge > structure.premiumEndAge ? `Age ${structure.premiumEndAge}-${structure.withdrawalStartAge}` : '0 years',
               buildPolicyWithdrawalLabel(structure),
               formatCurrency(projectedValue),
             ];

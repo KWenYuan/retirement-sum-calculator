@@ -154,8 +154,7 @@ export function PoliciesSection({ policies, setPolicies, profile, scenarioRate }
         continuePremiumsAfterCommitment: false,
         continuedPremiumEndAge: profile.retirementAge,
         annualReturn: 5,
-        useScenarioReturn: true,
-        holdingUntilAge: profile.retirementAge,
+        useScenarioReturn: false,
         withdrawalAge: profile.retirementAge,
         withdrawalStartAge: profile.retirementAge,
         withdrawalType: 'Lump sum',
@@ -257,29 +256,33 @@ export function InvestmentsSection({ investments, setInvestments, profile, scena
 
 function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePolicy, removePolicy, profile, scenarioRate }) {
   const structure = getPolicyStructure(policy, Number(profile.retirementAge));
-  const projectedValue = projectPolicyAccumulatedAtAge(policy, Number(profile.currentAge), structure.withdrawalStartAge || structure.holdingUntilAge, scenarioRate);
+  const projectedValue = projectPolicyAccumulatedAtAge(policy, Number(profile.currentAge), structure.withdrawalStartAge, scenarioRate);
   const payout = getPolicyPayoutSummary(policy, projectedValue, structure);
   const explanation = getPolicyExplanation(policy, projectedValue, structure);
   const premiumSummary = getPolicyPremiumSummary(policy, structure);
+  const policyStructure = policy.policyStructure || 'Custom';
+  const template = getPolicyTemplateConfig(policyStructure, policy.withdrawalType || structure.withdrawalType);
+  const timelineSteps = getPolicyTimelineSteps(policyStructure, structure);
   return (
     <div className="compact-item-card">
       <div className="compact-item-summary">
         <div>
           <strong>{policy.name || 'Policy'}</strong>
+          <span>{policyStructure}</span>
           <span>{premiumSummary.label}</span>
           <span>Premium period: Age {structure.startAge}-{structure.premiumEndAge}</span>
           {policy.startYear && <span>Start year: {policy.startYear}</span>}
-          <span>Holding period: Age {structure.premiumEndAge}-{structure.holdingUntilAge}</span>
+          <span>Compounding period: {getCompoundingPeriodLabel(structure)}</span>
           <span>Withdrawal: {payout.label}</span>
         </div>
         <div className="compact-item-value">
-          <span>Projected</span>
+          <span>Projected at age {structure.withdrawalStartAge}</span>
           <strong>{formatCurrency(projectedValue)}</strong>
         </div>
       </div>
       <div className="policy-phase-badges">
         <span>Paying premiums: Age {structure.startAge}-{structure.premiumEndAge}</span>
-        {structure.holdingUntilAge > structure.premiumEndAge && <span>Compounding: Age {structure.premiumEndAge}-{structure.holdingUntilAge}</span>}
+        {structure.withdrawalStartAge > structure.premiumEndAge && <span>Compounding: Age {structure.premiumEndAge}-{structure.withdrawalStartAge}</span>}
         <span>{payout.badge}</span>
       </div>
       <div className="policy-mini-timeline">
@@ -289,14 +292,10 @@ function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePo
           <span />
         </div>
         <div className="policy-mini-labels">
-          <b>Age {structure.startAge}</b>
-          <b>Age {structure.premiumEndAge}</b>
-          <b>Age {structure.holdingUntilAge}</b>
+          {timelineSteps.map((step) => <b key={step.label}>Age {step.age}</b>)}
         </div>
         <div className="policy-mini-phases">
-          <span>Pay premiums</span>
-          <span>Let policy grow</span>
-          <span>{structure.withdrawalType === 'Keep invested / no withdrawal yet' ? 'Keep invested' : 'Withdraw'}</span>
+          {timelineSteps.map((step) => <span key={step.label}>{step.label}</span>)}
         </div>
       </div>
       <div className="compact-item-actions">
@@ -311,16 +310,25 @@ function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePo
           <div className="form-grid compact input-compact-grid">
             <SelectField label="Policy structure" value={policy.policyStructure || 'Custom'} onChange={(value) => applyPolicyTemplate(policy, updatePolicy, value, profile)} options={POLICY_STRUCTURES} />
             <TextField label="Policy name" value={policy.name} onChange={(value) => updatePolicy(policy.id, 'name', value)} />
+            {template.showPolicyType && <TextField label="Policy type" value={policy.type} onChange={(value) => updatePolicy(policy.id, 'type', value)} />}
             <NumberField label="Start age" value={policy.startAge} onChange={(value) => updatePolicy(policy.id, 'startAge', value)} />
-            <NumberField label="Premium amount" prefix="$" value={policy.premiumAmount} onChange={(value) => updatePolicy(policy.id, 'premiumAmount', value)} />
-            <NumberField label="Premium commitment" suffix="years" value={policy.premiumCommitmentTerm ?? policy.premiumTermYears} onChange={(value) => updatePolicy(policy.id, 'premiumCommitmentTerm', value)} />
+            {template.showCurrentValue && <NumberField label="Current value" prefix="$" value={policy.currentValue} onChange={(value) => updatePolicy(policy.id, 'currentValue', value)} />}
+            {template.showPremium && <NumberField label="Premium amount" prefix="$" value={policy.premiumAmount} onChange={(value) => updatePolicy(policy.id, 'premiumAmount', value)} />}
+            {template.showPremium && <SelectField label="Premium frequency" value={policy.premiumFrequency} onChange={(value) => updatePolicy(policy.id, 'premiumFrequency', value)} options={['monthly', 'quarterly', 'semi-annually', 'annually']} />}
+            {template.showPremiumTerm && <NumberField label={template.premiumTermLabel} suffix="years" value={policy.premiumCommitmentTerm ?? policy.premiumTermYears} onChange={(value) => updatePolicy(policy.id, 'premiumCommitmentTerm', value)} />}
+            {template.showContinueUntil && <NumberField label="Continue premiums until age" value={policy.continuedPremiumEndAge ?? structure.withdrawalStartAge} onChange={(value) => {
+              updatePolicy(policy.id, 'continuePremiumsAfterCommitment', true);
+              updatePolicy(policy.id, 'continuedPremiumEndAge', value);
+            }} />}
             <NumberField label="Expected return" suffix="%" step={0.1} value={policy.annualReturn} onChange={(value) => updatePolicy(policy.id, 'annualReturn', value)} />
-            <NumberField label="Withdrawal age" value={policy.withdrawalStartAge ?? policy.withdrawalAge} onChange={(value) => {
+            <NumberField label={template.withdrawalAgeLabel} value={policy.withdrawalStartAge ?? policy.withdrawalAge ?? ''} onChange={(value) => {
               updatePolicy(policy.id, 'withdrawalStartAge', value);
               updatePolicy(policy.id, 'withdrawalAge', value);
-              updatePolicy(policy.id, 'holdingUntilAge', value);
             }} />
             <SelectField label="Withdrawal type" value={policy.withdrawalType || 'Lump sum'} onChange={(value) => updatePolicy(policy.id, 'withdrawalType', value)} options={['Lump sum', 'Monthly income', 'Yearly income', 'Keep invested / no withdrawal yet']} />
+            {(policy.withdrawalType === 'Monthly income' || policy.withdrawalType === 'Yearly income') && (
+              <NumberField label={template.withdrawalEndLabel} value={policy.withdrawalEndAge ?? ''} onChange={(value) => updatePolicy(policy.id, 'withdrawalEndAge', value)} />
+            )}
           </div>
           <div className="policy-derived-panel">
             <span>Premium commitment ends: <strong>{structure.commitmentEndAge}</strong></span>
@@ -337,9 +345,8 @@ function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePo
               <TextField label="Start year" value={policy.startYear} onChange={(value) => updatePolicy(policy.id, 'startYear', value)} />
               <Toggle label="Continue premiums after commitment" checked={Boolean(policy.continuePremiumsAfterCommitment)} onChange={(value) => updatePolicy(policy.id, 'continuePremiumsAfterCommitment', value)} />
               {policy.continuePremiumsAfterCommitment && (
-                <NumberField label="Continue premiums until age" value={policy.continuedPremiumEndAge ?? structure.holdingUntilAge} onChange={(value) => updatePolicy(policy.id, 'continuedPremiumEndAge', value)} />
+              <NumberField label="Continue premiums until age" value={policy.continuedPremiumEndAge ?? structure.withdrawalStartAge} onChange={(value) => updatePolicy(policy.id, 'continuedPremiumEndAge', value)} />
               )}
-              <NumberField label="Holding until age" value={policy.holdingUntilAge ?? structure.withdrawalStartAge} onChange={(value) => updatePolicy(policy.id, 'holdingUntilAge', value)} />
               {(policy.withdrawalType === 'Monthly income' || policy.withdrawalType === 'Yearly income') && (
                 <NumberField label="Withdrawal end age" value={policy.withdrawalEndAge} onChange={(value) => updatePolicy(policy.id, 'withdrawalEndAge', value)} />
               )}
@@ -470,30 +477,131 @@ function getPolicyPremiumSummary(policy, structure) {
   };
 }
 
+function getCompoundingPeriodLabel(structure) {
+  if (structure.withdrawalStartAge <= structure.premiumEndAge) return '0 years after premium';
+  return `Age ${structure.premiumEndAge}-${structure.withdrawalStartAge}`;
+}
+
+function getPolicyTemplateConfig(structure, withdrawalType) {
+  const isIncome = withdrawalType === 'Monthly income' || withdrawalType === 'Yearly income';
+  const base = {
+    showPolicyType: false,
+    showCurrentValue: false,
+    showPremium: true,
+    showPremiumTerm: true,
+    showContinueUntil: false,
+    premiumTermLabel: 'Premium commitment',
+    withdrawalAgeLabel: 'Withdrawal age',
+    withdrawalEndLabel: 'Withdrawal end age',
+  };
+
+  if (structure === 'Endowment / maturity plan') {
+    return {
+      ...base,
+      premiumTermLabel: 'Premium term',
+      withdrawalAgeLabel: 'Maturity age',
+    };
+  }
+  if (structure === 'Investment policy with fixed premium commitment') {
+    return {
+      ...base,
+      withdrawalEndLabel: isIncome ? 'Income end age' : 'Withdrawal end age',
+    };
+  }
+  if (structure === 'Investment policy with ongoing premium') {
+    return {
+      ...base,
+      showPremiumTerm: false,
+      showContinueUntil: true,
+      withdrawalEndLabel: isIncome ? 'Income end age' : 'Withdrawal end age',
+    };
+  }
+  if (structure === 'Retirement income policy') {
+    return {
+      ...base,
+      withdrawalAgeLabel: 'Income start age',
+      withdrawalEndLabel: 'Income end age',
+    };
+  }
+  if (structure === 'Lump sum withdrawal policy') {
+    return {
+      ...base,
+      showCurrentValue: true,
+      showPremium: false,
+      showPremiumTerm: false,
+      withdrawalAgeLabel: 'Withdrawal age',
+    };
+  }
+  return {
+    ...base,
+    showPolicyType: true,
+    showCurrentValue: true,
+    showContinueUntil: true,
+  };
+}
+
+function getPolicyTimelineSteps(policyStructure, structure) {
+  if (policyStructure === 'Endowment / maturity plan') {
+    return [
+      { age: structure.startAge, label: 'Pay premiums' },
+      { age: structure.withdrawalStartAge, label: 'Maturity' },
+      { age: structure.withdrawalStartAge, label: 'Lump sum' },
+    ];
+  }
+  if (policyStructure === 'Investment policy with ongoing premium') {
+    return [
+      { age: structure.startAge, label: 'Pay premiums' },
+      { age: structure.withdrawalStartAge, label: structure.withdrawalType === 'Lump sum' ? 'Withdraw' : 'Start income' },
+      { age: structure.withdrawalType === 'Lump sum' ? structure.withdrawalStartAge : structure.withdrawalEndAge, label: structure.withdrawalType === 'Lump sum' ? 'Lump sum' : 'End income' },
+    ];
+  }
+  if (policyStructure === 'Retirement income policy') {
+    return [
+      { age: structure.startAge, label: 'Build policy' },
+      { age: structure.withdrawalStartAge, label: 'Income starts' },
+      { age: structure.withdrawalEndAge, label: 'Income ends' },
+    ];
+  }
+  return [
+    { age: structure.startAge, label: 'Pay premiums' },
+    ...(structure.withdrawalStartAge > structure.premiumEndAge
+      ? [{ age: structure.premiumEndAge, label: 'Let policy grow' }]
+      : []),
+    { age: structure.withdrawalStartAge, label: structure.withdrawalType === 'Keep invested / no withdrawal yet' ? 'Keep invested' : 'Withdraw' },
+  ];
+}
+
 function applyPolicyTemplate(policy, updatePolicy, structure, profile) {
   updatePolicy(policy.id, 'policyStructure', structure);
+  const withdrawalAge = policy.withdrawalStartAge ?? policy.withdrawalAge ?? profile.retirementAge;
+  if (structure === 'Endowment / maturity plan') {
+    updatePolicy(policy.id, 'continuePremiumsAfterCommitment', false);
+    updatePolicy(policy.id, 'withdrawalType', policy.withdrawalType === 'Monthly income' || policy.withdrawalType === 'Yearly income' ? policy.withdrawalType : 'Lump sum');
+  }
+  if (structure === 'Investment policy with fixed premium commitment') {
+    updatePolicy(policy.id, 'continuePremiumsAfterCommitment', false);
+  }
   if (structure === 'Investment policy with ongoing premium') {
     updatePolicy(policy.id, 'continuePremiumsAfterCommitment', true);
-    updatePolicy(policy.id, 'continuedPremiumEndAge', profile.retirementAge);
+    updatePolicy(policy.id, 'continuedPremiumEndAge', withdrawalAge);
   }
   if (structure === 'Retirement income policy') {
     updatePolicy(policy.id, 'withdrawalType', 'Monthly income');
-    updatePolicy(policy.id, 'withdrawalStartAge', profile.retirementAge);
-    updatePolicy(policy.id, 'withdrawalAge', profile.retirementAge);
-    updatePolicy(policy.id, 'holdingUntilAge', profile.retirementAge);
-    updatePolicy(policy.id, 'withdrawalEndAge', profile.retirementAge + 10);
+    updatePolicy(policy.id, 'withdrawalStartAge', withdrawalAge);
+    updatePolicy(policy.id, 'withdrawalAge', withdrawalAge);
+    updatePolicy(policy.id, 'withdrawalEndAge', policy.withdrawalEndAge ?? Number(withdrawalAge) + 10);
   }
-  if (structure === 'Lump sum withdrawal policy' || structure === 'Endowment / maturity plan') {
+  if (structure === 'Lump sum withdrawal policy') {
     updatePolicy(policy.id, 'withdrawalType', 'Lump sum');
-    updatePolicy(policy.id, 'withdrawalStartAge', profile.retirementAge);
-    updatePolicy(policy.id, 'withdrawalAge', profile.retirementAge);
-    updatePolicy(policy.id, 'holdingUntilAge', profile.retirementAge);
+    updatePolicy(policy.id, 'continuePremiumsAfterCommitment', false);
+    updatePolicy(policy.id, 'withdrawalStartAge', withdrawalAge);
+    updatePolicy(policy.id, 'withdrawalAge', withdrawalAge);
   }
 }
 
 function getPolicyPayoutSummary(policy, projectedValue, structure) {
   if (structure.withdrawalType === 'Keep invested / no withdrawal yet') {
-    return { label: `Keep invested until age ${structure.holdingUntilAge}`, badge: 'No withdrawal selected', amount: '' };
+    return { label: `Keep invested at age ${structure.withdrawalStartAge}`, badge: 'No withdrawal selected', amount: '' };
   }
   if (structure.withdrawalType === 'Monthly income') {
     const monthly = projectedValue / (structure.withdrawalDuration * 12);
@@ -520,6 +628,20 @@ function getPolicyPayoutSummary(policy, projectedValue, structure) {
 
 function getPolicyExplanation(policy, projectedValue, structure) {
   const premium = `${formatCurrency(policy.premiumAmount)}/${frequencyShortLabel(policy.premiumFrequency)}`;
+  const policyStructure = policy.policyStructure || 'Custom';
+  if (policyStructure === 'Investment policy with ongoing premium') {
+    return `You contribute ${premium} from age ${structure.startAge} to ${structure.premiumEndAge}. The projected value at age ${structure.withdrawalStartAge} is ${formatCurrency(projectedValue)}, then it is used for the selected withdrawal strategy.`;
+  }
+  if (policyStructure === 'Retirement income policy') {
+    const payout = getPolicyPayoutSummary(policy, projectedValue, structure).amount;
+    return `You build the policy from age ${structure.startAge}. Based on the selected return assumption, the projected value at age ${structure.withdrawalStartAge} is converted into estimated income of ${payout || formatCurrency(projectedValue)} from age ${structure.withdrawalStartAge} to ${structure.withdrawalEndAge}.`;
+  }
+  if (policyStructure === 'Endowment / maturity plan') {
+    return `You contribute ${premium} for ${structure.premiumCommitmentTerm} years from age ${structure.startAge} to ${structure.commitmentEndAge}. The plan is assumed to mature at age ${structure.withdrawalStartAge} with a projected value of ${formatCurrency(projectedValue)}.`;
+  }
+  if (policyStructure === 'Lump sum withdrawal policy') {
+    return `The policy is projected to grow to ${formatCurrency(projectedValue)} by age ${structure.withdrawalStartAge}, based on the selected return assumption, and is shown as a lump sum withdrawal.`;
+  }
   const premiumPhrase = policy.continuePremiumsAfterCommitment
     ? `You contribute ${premium} from age ${structure.startAge} to ${structure.premiumEndAge}.`
     : `You contribute ${premium} for ${structure.premiumCommitmentTerm} years from age ${structure.startAge} to ${structure.commitmentEndAge}.`;
@@ -528,7 +650,7 @@ function getPolicyExplanation(policy, projectedValue, structure) {
     return `${premiumPhrase} The policy is then assumed to stay invested until age ${structure.withdrawalStartAge}. The projected value is converted into an estimated payout of ${payout} over ${structure.withdrawalDuration} years.`;
   }
   if (structure.withdrawalType === 'Keep invested / no withdrawal yet') {
-    return `${premiumPhrase} After that, the policy is assumed to remain invested through age ${structure.holdingUntilAge}, with no withdrawal selected yet.`;
+    return `${premiumPhrase} After that, the policy is assumed to remain invested through age ${structure.withdrawalStartAge}, with no withdrawal selected yet.`;
   }
   return `${premiumPhrase} After that, the policy is assumed to stay invested until age ${structure.withdrawalStartAge}. Based on the selected return assumption, the projected lump sum at age ${structure.withdrawalStartAge} is ${formatCurrency(projectedValue)}.`;
 }

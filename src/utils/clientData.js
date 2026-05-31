@@ -45,7 +45,7 @@ export function buildClientDataState({
     profile,
     cpf,
     srs,
-    policies,
+    policies: sanitizePolicies(policies),
     investments: sanitizeInvestments(
       investments,
       profile,
@@ -239,6 +239,7 @@ function normalizeList(value, defaults) {
       ...(isPolicy ? normalizePolicyFields(item, fallback) : normalizeInvestmentFields(item, fallback)),
       id: item?.id || `imported-${index + 1}`,
     };
+    if (isPolicy) delete normalized.holdingUntilAge;
     if (!isPolicy) delete normalized.riskLevel;
     return normalized;
   });
@@ -249,18 +250,37 @@ function normalizePolicyFields(item = {}, fallback = {}) {
   const commitmentTerm = item.premiumCommitmentTerm ?? item.premiumTermYears ?? fallback.premiumCommitmentTerm;
   const withdrawalAge = item.withdrawalStartAge ?? item.withdrawalAge ?? fallback.withdrawalStartAge;
   return {
-    policyStructure: item.policyStructure || fallback.policyStructure || 'Custom',
+    policyStructure: item.policyStructure || inferPolicyStructure(item, fallback),
     premiumCommitmentTerm: commitmentTerm,
     premiumTermYears: item.premiumTermYears ?? commitmentTerm,
     continuePremiumsAfterCommitment: Boolean(item.continuePremiumsAfterCommitment),
-    continuedPremiumEndAge: item.continuedPremiumEndAge ?? item.holdingUntilAge ?? withdrawalAge,
-    holdingUntilAge: item.holdingUntilAge ?? withdrawalAge,
+    continuedPremiumEndAge: item.continuedPremiumEndAge ?? withdrawalAge,
     withdrawalStartAge: withdrawalAge,
     withdrawalAge,
     withdrawalEndAge: item.withdrawalEndAge ?? (Number(withdrawalAge) || Number(startAge) || 0) + 10,
     withdrawalType: item.withdrawalType || fallback.withdrawalType || 'Lump sum',
     showClientExplanation: Boolean(item.showClientExplanation),
   };
+}
+
+function sanitizePolicies(policies = []) {
+  return policies.map((policy) => {
+    const { holdingUntilAge, ...rest } = policy;
+    return {
+      ...rest,
+      withdrawalAge: policy.withdrawalStartAge ?? policy.withdrawalAge,
+    };
+  });
+}
+
+function inferPolicyStructure(item = {}, fallback = {}) {
+  const withdrawalType = item.withdrawalType || fallback.withdrawalType;
+  if (withdrawalType === 'Monthly income' || withdrawalType === 'Yearly income') return 'Retirement income policy';
+  if (item.continuePremiumsAfterCommitment) return 'Investment policy with ongoing premium';
+  if (typeof item.premiumCommitmentTerm !== 'undefined' || typeof item.premiumTermYears !== 'undefined') {
+    return 'Investment policy with fixed premium commitment';
+  }
+  return 'Custom';
 }
 
 function normalizeInvestmentFields(item = {}, fallback = {}) {

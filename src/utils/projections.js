@@ -234,7 +234,7 @@ const projectPolicyWithContributionDelay = (policy, currentAge, targetAge, scena
   const selectedAge = asNumber(currentAge) + years;
   const structure = getPolicyStructure(policy, targetAge);
   const annualPremium = asNumber(policy.premiumAmount) * (frequencyMultiplier[policy.premiumFrequency] || 12);
-  const effectiveRate = getEffectiveRate(policy.annualReturn, policy.useScenarioReturn, scenarioRate);
+  const effectiveRate = asNumber(policy.annualReturn);
   const accumulatedValue = projectPolicyAccumulatedValue({
     policy,
     structure,
@@ -278,7 +278,7 @@ const projectPolicyWithContributionDelay = (policy, currentAge, targetAge, scena
 export const projectPolicyAccumulatedAtAge = (policy, currentAge, targetAge, scenarioRate) => {
   const structure = getPolicyStructure(policy, targetAge);
   const annualPremium = asNumber(policy.premiumAmount) * (frequencyMultiplier[policy.premiumFrequency] || 12);
-  const effectiveRate = getEffectiveRate(policy.annualReturn, policy.useScenarioReturn, scenarioRate);
+  const effectiveRate = asNumber(policy.annualReturn);
   return projectPolicyAccumulatedValue({
     policy,
     structure,
@@ -313,17 +313,21 @@ const projectPolicyAccumulatedValue = ({
 };
 
 export const getPolicyStructure = (policy, fallbackAge = 65) => {
-  const startAge = asNumber(policy.startAge);
-  const premiumCommitmentTerm = asNumber(policy.premiumCommitmentTerm ?? policy.premiumTermYears);
+  const valueOrFallback = (value, fallback) => (
+    value === '' || value === null || typeof value === 'undefined'
+      ? fallback
+      : asNumber(value)
+  );
+  const startAge = valueOrFallback(policy.startAge, fallbackAge);
+  const premiumCommitmentTerm = Math.max(0, valueOrFallback(policy.premiumCommitmentTerm ?? policy.premiumTermYears, 0));
   const commitmentEndAge = startAge + premiumCommitmentTerm;
-  const holdingUntilAge = asNumber(policy.holdingUntilAge ?? policy.withdrawalStartAge ?? policy.withdrawalAge) || fallbackAge;
-  const withdrawalStartAge = asNumber(policy.withdrawalStartAge ?? policy.withdrawalAge ?? holdingUntilAge) || holdingUntilAge;
+  const withdrawalStartAge = valueOrFallback(policy.withdrawalStartAge ?? policy.withdrawalAge, fallbackAge);
   const withdrawalType = policy.withdrawalType || 'Lump sum';
   const continuedPremiumEndAge = policy.continuePremiumsAfterCommitment
-    ? asNumber(policy.continuedPremiumEndAge ?? holdingUntilAge) || holdingUntilAge
+    ? valueOrFallback(policy.continuedPremiumEndAge, withdrawalStartAge)
     : commitmentEndAge;
   const premiumEndAge = Math.max(commitmentEndAge, continuedPremiumEndAge);
-  const withdrawalEndAge = asNumber(policy.withdrawalEndAge) || withdrawalStartAge + 10;
+  const withdrawalEndAge = valueOrFallback(policy.withdrawalEndAge, withdrawalStartAge + 10);
   const withdrawalDuration = Math.max(1, withdrawalEndAge - withdrawalStartAge);
 
   return {
@@ -332,12 +336,11 @@ export const getPolicyStructure = (policy, fallbackAge = 65) => {
     commitmentEndAge,
     continuedPremiumEndAge,
     premiumEndAge,
-    holdingUntilAge,
     withdrawalStartAge,
     withdrawalEndAge,
     withdrawalDuration,
     withdrawalType,
-    postCommitmentGrowthYears: Math.max(0, holdingUntilAge - commitmentEndAge),
+    postCommitmentGrowthYears: Math.max(0, withdrawalStartAge - premiumEndAge),
   };
 };
 
@@ -538,7 +541,7 @@ export const buildRetirementTimeline = (state) => {
 
   state.policies.forEach((policy) => {
     const structure = getPolicyStructure(policy, state.profile.retirementAge);
-    const withdrawalAge = structure.withdrawalStartAge || structure.holdingUntilAge;
+    const withdrawalAge = structure.withdrawalStartAge;
     const projectedValue = projectPolicyAccumulatedAtAge(policy, startAge, withdrawalAge, state.scenarioRate);
     const type = structure.withdrawalType;
     if (type === 'Keep invested / no withdrawal yet') return;

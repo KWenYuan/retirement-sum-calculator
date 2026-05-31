@@ -108,7 +108,6 @@ export function buildChangedSinceLastReview(previousReviewData, currentState, co
     ['premiumCommitmentTerm', 'premium commitment', 'years'],
     ['premiumAmount', 'premium', 'currency'],
     ['currentValue', 'current value', 'currency'],
-    ['holdingUntilAge', 'holding age', 'number'],
     ['withdrawalStartAge', 'withdrawal age', 'number'],
     ['withdrawalType', 'payout type', 'text'],
   ]);
