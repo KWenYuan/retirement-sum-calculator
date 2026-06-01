@@ -1,11 +1,10 @@
-import { FolderUp, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { formatCurrency } from '../utils/projections.js';
 
 export function AnnualReview({
   previousReviewData,
   comparison,
   changes,
-  importPreviousReviewData,
   clearPreviousReviewData,
 }) {
   return (
@@ -13,13 +12,9 @@ export function AnnualReview({
       <div className="section-header">
         <div>
           <h2>Annual Review</h2>
-          <p className="section-subtext">Import last year’s client data for comparison without replacing current inputs.</p>
+          <p className="section-subtext">Previous review comparisons are restored from full client data imports when available.</p>
         </div>
         <div className="review-actions">
-          <button className="ghost-button data-action-button" type="button" onClick={importPreviousReviewData}>
-            <FolderUp size={16} />
-            Import Previous Review Data
-          </button>
           {previousReviewData && (
             <button className="ghost-button data-action-button subtle" type="button" onClick={clearPreviousReviewData}>
               <RotateCcw size={16} />

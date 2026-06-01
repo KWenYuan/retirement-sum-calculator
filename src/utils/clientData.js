@@ -11,8 +11,14 @@ import {
   getInvestmentStructure,
   projectInvestmentAccumulatedAtAge,
 } from './projections.js';
+import {
+  restorePolicySummaryData,
+  validatePolicySummaryPayload,
+} from './policySummary.js';
 
 export const CLIENT_DATA_APP_NAME = 'Retirement Sum Calculator';
+export const FULL_CLIENT_APP_NAME = 'Retirement Projection Studio';
+export const FULL_CLIENT_EXPORT_TYPE = 'Full Client Data';
 export const CLIENT_DATA_SCHEMA_VERSION = 2;
 export const CLIENT_DATA_STORAGE_KEY = 'retirement-sum-calculator-client-data';
 
@@ -24,6 +30,56 @@ export function buildExportPayload(data) {
     schemaVersion: CLIENT_DATA_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     data,
+  };
+}
+
+export function buildFullClientExportPayload({ clientDataState, policySummaryData }) {
+  const profile = clientDataState.profile || defaultProfile;
+  const policySummary = policySummaryData || {};
+  return {
+    appName: FULL_CLIENT_APP_NAME,
+    exportType: FULL_CLIENT_EXPORT_TYPE,
+    schemaVersion: CLIENT_DATA_SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    data: {
+      clientProfile: profile,
+      policySummary: {
+        client: policySummary.client || {
+          clientName: profile.clientName,
+          dateOfBirth: profile.dateOfBirth,
+          age: profile.currentAge,
+          reviewDate: profile.reviewDate,
+          advisorName: profile.advisorName,
+        },
+        policies: policySummary.policies || [],
+        benchmark: policySummary.benchmark || {},
+        notes: policySummary.notes || '',
+      },
+      policySummaryPolicies: policySummary.policies || [],
+      retirementInputs: {
+        profile,
+        cpf: clientDataState.cpf || {},
+        srs: clientDataState.srs || {},
+        investments: clientDataState.investments || [],
+        cashSavings: clientDataState.cash || {},
+        assumptions: {
+          scenario: clientDataState.scenario || 'balanced',
+          selectedAge: clientDataState.selectedAge,
+          advisorInsight: clientDataState.advisorInsight || '',
+          includeFollowUpTasksInPdf: Boolean(clientDataState.includeFollowUpTasksInPdf),
+        },
+      },
+      annualReview: {
+        previousReviewData: clientDataState.previousReviewData || null,
+        followUpTasks: clientDataState.followUpTasks || [],
+      },
+      appSettings: {
+        currentPage: 'input',
+        selectedAge: clientDataState.selectedAge,
+        scenario: clientDataState.scenario || 'balanced',
+      },
+      legacyRetirementState: clientDataState,
+    },
   };
 }
 
@@ -112,6 +168,19 @@ export function downloadClientData(payload, clientName, exportDate) {
   URL.revokeObjectURL(url);
 }
 
+export function downloadFullClientData(payload, clientName, exportDate) {
+  const filename = buildFullClientDataFilename(clientName, exportDate);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function importClientData(file) {
   if (!file) return null;
   const isJson = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
@@ -132,6 +201,29 @@ export async function importClientData(file) {
   }
 
   return restoreCalculatorState(payload.data);
+}
+
+export async function importFullClientData(file) {
+  const payload = await readJsonFile(file);
+  if (isFullClientPayload(payload)) {
+    return restoreFullClientPayload(payload);
+  }
+  if (validateImportPayload(payload).valid) {
+    return {
+      retirementState: restoreCalculatorState(payload.data),
+      policySummaryData: null,
+      message: 'Partial retirement file imported. Some policy summary sections may not be available in this older export.',
+    };
+  }
+  if (validatePolicySummaryPayload(payload) || hasPolicySummaryData(payload)) {
+    const policySummaryData = restorePolicySummaryData(getPolicySummaryPayloadData(payload));
+    return {
+      retirementState: buildRetirementStateFromPolicySummary(policySummaryData),
+      policySummaryData,
+      message: 'Partial policy summary file imported. Retirement input sections may need to be updated.',
+    };
+  }
+  throw new Error('Unable to import this file. Please check that it is a valid client JSON export.');
 }
 
 export async function importPreviousReviewData(file) {
@@ -229,6 +321,112 @@ function buildDataFilename(clientName, exportDate) {
     .replace(/[^a-z0-9]+/gi, '-')
     .replace(/^-+|-+$/g, '');
   return `${cleanName ? `${cleanName}-` : ''}Retirement-Data-${exportDate}.json`;
+}
+
+function buildFullClientDataFilename(clientName, exportDate) {
+  const cleanName = (clientName || '')
+    .trim()
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${cleanName ? `${cleanName}-` : ''}Full-Client-Data-${exportDate}.json`;
+}
+
+async function readJsonFile(file) {
+  if (!file) return null;
+  const isJson = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
+  if (!isJson) {
+    throw new Error('Unable to import this file. Please check that it is a valid client JSON export.');
+  }
+  try {
+    return JSON.parse(await file.text());
+  } catch {
+    throw new Error('Unable to import this file. Please check that it is a valid client JSON export.');
+  }
+}
+
+function isFullClientPayload(payload) {
+  return Boolean(
+    payload &&
+    payload.appName === FULL_CLIENT_APP_NAME &&
+    payload.exportType === FULL_CLIENT_EXPORT_TYPE &&
+    payload.data,
+  );
+}
+
+function restoreFullClientPayload(payload) {
+  const data = payload.data || {};
+  const retirementInputs = data.retirementInputs || {};
+  const assumptions = retirementInputs.assumptions || {};
+  const annualReview = data.annualReview || {};
+  const appSettings = data.appSettings || {};
+  const legacyRetirementState = data.legacyRetirementState || {};
+  const profile = {
+    ...defaultProfile,
+    ...(data.clientProfile || {}),
+    ...(retirementInputs.profile || legacyRetirementState.profile || {}),
+  };
+  const retirementState = restoreCalculatorState({
+    ...legacyRetirementState,
+    profile,
+    cpf: retirementInputs.cpf || legacyRetirementState.cpf,
+    srs: retirementInputs.srs || legacyRetirementState.srs,
+    policies: [],
+    investments: retirementInputs.investments || legacyRetirementState.investments,
+    cash: retirementInputs.cashSavings || legacyRetirementState.cash,
+    scenario: assumptions.scenario || appSettings.scenario || legacyRetirementState.scenario,
+    selectedAge: assumptions.selectedAge ?? appSettings.selectedAge ?? legacyRetirementState.selectedAge,
+    advisorInsight: assumptions.advisorInsight ?? legacyRetirementState.advisorInsight,
+    previousReviewData: annualReview.previousReviewData ?? legacyRetirementState.previousReviewData,
+    followUpTasks: annualReview.followUpTasks ?? legacyRetirementState.followUpTasks,
+    includeFollowUpTasksInPdf: assumptions.includeFollowUpTasksInPdf ?? legacyRetirementState.includeFollowUpTasksInPdf,
+  });
+  const policySummarySource = data.policySummary || {};
+  const policySummaryData = restorePolicySummaryData({
+    clientDetails: policySummarySource.client || data.clientProfile || {},
+    policySummaryPolicies: policySummarySource.policies || data.policySummaryPolicies || [],
+    benchmarkAssumptions: policySummarySource.benchmark || {},
+    notes: policySummarySource.notes || '',
+  });
+  return {
+    retirementState,
+    policySummaryData,
+    message: 'Full client data imported successfully.',
+  };
+}
+
+function hasPolicySummaryData(payload) {
+  const data = payload?.data || payload || {};
+  return Boolean(data.policySummaryPolicies || data.policies || data.policySummary?.policies);
+}
+
+function getPolicySummaryPayloadData(payload) {
+  if (validatePolicySummaryPayload(payload)) return payload.data;
+  const data = payload?.data || payload || {};
+  if (data.policySummary?.policies) {
+    return {
+      clientDetails: data.policySummary.client || data.clientProfile || {},
+      policySummaryPolicies: data.policySummary.policies,
+      benchmarkAssumptions: data.policySummary.benchmark || {},
+      notes: data.policySummary.notes || '',
+    };
+  }
+  return data;
+}
+
+function buildRetirementStateFromPolicySummary(policySummaryData) {
+  const client = policySummaryData?.client || {};
+  return restoreCalculatorState({
+    profile: {
+      ...defaultProfile,
+      clientName: client.clientName || defaultProfile.clientName,
+      dateOfBirth: client.dateOfBirth || defaultProfile.dateOfBirth,
+      currentAge: client.age || defaultProfile.currentAge,
+      reviewDate: client.reviewDate || defaultProfile.reviewDate,
+      advisorName: client.advisorName || defaultProfile.advisorName,
+    },
+    policies: [],
+    investments: [],
+  });
 }
 
 function normalizeList(value, defaults) {

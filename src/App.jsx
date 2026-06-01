@@ -28,12 +28,11 @@ import {
 } from './data/defaults.js';
 import {
   buildClientDataState,
-  buildExportPayload,
+  buildFullClientExportPayload,
   clearSavedClientData,
   defaultAdvisorInsight,
-  downloadClientData,
-  importClientData,
-  importPreviousReviewData,
+  downloadFullClientData,
+  importFullClientData,
   loadClientDataFromStorage,
   saveClientDataToStorage,
 } from './utils/clientData.js';
@@ -80,13 +79,13 @@ export default function App() {
   const [previousReviewData, setPreviousReviewData] = useState(savedState?.previousReviewData || null);
   const [includeFollowUpTasksInPdf, setIncludeFollowUpTasksInPdf] = useState(savedState?.includeFollowUpTasksInPdf || false);
   const [policySummaryData, setPolicySummaryData] = useState(() => loadPolicySummaryFromStorage());
+  const [policySummaryRenderKey, setPolicySummaryRenderKey] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [dataMessage, setDataMessage] = useState('');
   const [dataError, setDataError] = useState('');
   const exportReportRef = useRef(null);
   const importInputRef = useRef(null);
-  const previousReviewInputRef = useRef(null);
 
   const scenarioRate = SCENARIOS[scenario].returnRate;
   const sharedPolicySummaryClient = useMemo(() => ({
@@ -216,60 +215,41 @@ export default function App() {
     }
   };
 
-  const exportClientData = () => {
+  const exportFullClientData = () => {
     setDataError('');
-    const payload = buildExportPayload(clientDataState);
-    downloadClientData(payload, profile.clientName, exportDate);
-    setDataMessage('Client data exported successfully.');
+    const payload = buildFullClientExportPayload({ clientDataState, policySummaryData });
+    downloadFullClientData(payload, profile.clientName, exportDate);
+    setDataMessage('Full client data exported successfully.');
   };
 
-  const requestImportClientData = () => {
+  const requestImportFullClientData = () => {
     setDataError('');
     setDataMessage('');
     importInputRef.current?.click();
   };
 
-  const requestImportPreviousReviewData = () => {
-    setDataError('');
-    setDataMessage('');
-    previousReviewInputRef.current?.click();
-  };
-
-  const handleImportClientData = async (event) => {
+  const handleImportFullClientData = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
 
-    const shouldContinue = window.confirm('Importing this file will replace the current calculator inputs. Continue?');
+    const shouldContinue = window.confirm('Importing this file will replace the current client inputs. Continue?');
     if (!shouldContinue) return;
 
     try {
-      const restoredState = await importClientData(file);
-      if (!restoredState) return;
-      restoreState(restoredState);
-      setDataMessage('Client data imported successfully.');
+      const restored = await importFullClientData(file);
+      if (!restored) return;
+      if (restored.retirementState) restoreState(restored.retirementState);
+      if (restored.policySummaryData) {
+        setPolicySummaryData(restored.policySummaryData);
+        savePolicySummaryToStorage(restored.policySummaryData);
+        setPolicySummaryRenderKey((key) => key + 1);
+      }
+      setDataMessage(restored.message || 'Full client data imported successfully.');
       setDataError('');
     } catch (error) {
-      console.error('Client data import failed:', error);
-      setDataError(error.message || 'Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
-      setDataMessage('');
-    }
-  };
-
-  const handleImportPreviousReviewData = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-
-    try {
-      const reviewData = await importPreviousReviewData(file);
-      if (!reviewData) return;
-      setPreviousReviewData(reviewData);
-      setDataMessage('Previous review data imported for comparison.');
-      setDataError('');
-    } catch (error) {
-      console.error('Previous review import failed:', error);
-      setDataError(error.message || 'Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
+      console.error('Full client data import failed:', error);
+      setDataError(error.message || 'Unable to import this file. Please check that it is a valid client JSON export.');
       setDataMessage('');
     }
   };
@@ -322,11 +302,12 @@ export default function App() {
             <ProfileSection profile={profile} setProfile={setProfile} />
 
             <PolicySummary
+              key={`input-policy-${policySummaryRenderKey}`}
               editable
               showClientDetails={false}
               showReport={false}
               showPdfExport={false}
-              showJsonActions
+              showJsonActions={false}
               sharedClient={sharedPolicySummaryClient}
               onClientImport={handlePolicySummaryClientImport}
               onDataChange={handlePolicySummaryDataChange}
@@ -354,24 +335,20 @@ export default function App() {
               previousReviewData={previousReviewData}
               comparison={annualReviewComparison}
               changes={reviewChanges}
-              importPreviousReviewData={requestImportPreviousReviewData}
               clearPreviousReviewData={clearPreviousReviewData}
             />
 
             <section className="panel data-export-panel">
               <div>
                 <h2>Data Import / Export</h2>
-                <p>Retirement JSON controls are here. Policy Summary JSON controls are in the Policy Summary Inputs card above.</p>
+                <p>Save or restore the full client file, including profile, policy summary, retirement inputs, and review data.</p>
               </div>
               <div className="data-export-actions">
-                <button className="ghost-button data-action-button" type="button" onClick={exportClientData}>
-                  Export Retirement Client Data
+                <button className="ghost-button data-action-button" type="button" onClick={requestImportFullClientData}>
+                  Import Full Client Data
                 </button>
-                <button className="ghost-button data-action-button" type="button" onClick={requestImportClientData}>
-                  Import Retirement Client Data
-                </button>
-                <button className="ghost-button data-action-button subtle" type="button" onClick={clearBrowserSavedData}>
-                  Clear Saved Data
+                <button className="ghost-button data-action-button" type="button" onClick={exportFullClientData}>
+                  Export Full Client Data
                 </button>
               </div>
             </section>
@@ -436,8 +413,8 @@ export default function App() {
               advisorInsight={advisorInsight}
               setAdvisorInsight={setAdvisorInsight}
               exportPdf={exportPdf}
-              exportClientData={exportClientData}
-              importClientData={requestImportClientData}
+              exportClientData={exportFullClientData}
+              importClientData={requestImportFullClientData}
               clearSavedData={clearBrowserSavedData}
               isExporting={isExporting}
               exportError={exportError}
@@ -474,6 +451,7 @@ export default function App() {
 
       {currentPage === 'policySummary' && (
         <PolicySummary
+          key={`policy-page-${policySummaryRenderKey}`}
           editable={false}
           showReport
           showPdfExport
@@ -514,14 +492,7 @@ export default function App() {
         className="hidden-file-input"
         type="file"
         accept="application/json,.json"
-        onChange={handleImportClientData}
-      />
-      <input
-        ref={previousReviewInputRef}
-        className="hidden-file-input"
-        type="file"
-        accept="application/json,.json"
-        onChange={handleImportPreviousReviewData}
+        onChange={handleImportFullClientData}
       />
     </div>
   );
