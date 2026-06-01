@@ -55,7 +55,8 @@ const getPolicyCashValueAtAge = (asset = {}, currentAge, targetAge) => {
   const current = asNumber(currentAge);
   const age = asNumber(targetAge);
   const startAge = asNumber(asset.startAge) || current;
-  if (age < startAge || age > current) return 0;
+  if (age < startAge) return 0;
+  if (age >= current) return cashValue;
   if (startAge >= current) return age === current ? cashValue : 0;
   const progress = (age - startAge) / (current - startAge);
   return Math.max(0, cashValue * progress);

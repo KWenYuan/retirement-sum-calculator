@@ -89,6 +89,8 @@ button {
 }
 
 .mode-toolbar-actions {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -97,6 +99,8 @@ button {
 }
 
 .page-toggle {
+  position: relative;
+  z-index: 3;
   display: inline-flex;
   gap: 4px;
   padding: 4px;
@@ -106,6 +110,11 @@ button {
 }
 
 .page-toggle button {
+  position: relative;
+  z-index: 4;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(196, 154, 67, 0.24);
   min-height: 36px;
   padding: 0 13px;
   border: 0;
@@ -203,8 +212,27 @@ button {
 }
 
 .client-input-flow .policy-summary-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
   padding: 0;
   background: transparent;
+}
+
+.client-input-flow .policy-summary-editor,
+.client-input-flow .policy-summary-page > .policy-summary-editor,
+.client-input-flow .policy-summary-page > .policy-summary-hero,
+.client-input-flow .policy-summary-page > .policy-export-hidden {
+  width: 100%;
+  min-width: 0;
+}
+
+.client-input-flow .policy-summary-card,
+.client-input-flow .compact-item-card,
+.client-input-flow .input-accordion,
+.client-input-flow .panel {
+  max-width: 100%;
 }
 
 .client-input-flow .policy-summary-hero {

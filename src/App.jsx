@@ -300,6 +300,21 @@ export default function App() {
           {dataMessage && <div className="data-message">{dataMessage}</div>}
 
           <section className="client-input-flow">
+            <section className="panel data-export-panel client-data-panel">
+              <div>
+                <h2>Client Data</h2>
+                <p>Import or export the full client file, including profile, policies, retirement inputs, and review data.</p>
+              </div>
+              <div className="data-export-actions">
+                <button className="ghost-button data-action-button" type="button" onClick={requestImportFullClientData}>
+                  Import Full Client Data
+                </button>
+                <button className="ghost-button data-action-button" type="button" onClick={exportFullClientData}>
+                  Export Full Client Data
+                </button>
+              </div>
+            </section>
+
             <ProfileSection profile={profile} setProfile={setProfile} />
 
             <PolicySummary
@@ -338,21 +353,6 @@ export default function App() {
               changes={reviewChanges}
               clearPreviousReviewData={clearPreviousReviewData}
             />
-
-            <section className="panel data-export-panel">
-              <div>
-                <h2>Data Import / Export</h2>
-                <p>Save or restore the full client file, including profile, policy summary, retirement inputs, and review data.</p>
-              </div>
-              <div className="data-export-actions">
-                <button className="ghost-button data-action-button" type="button" onClick={requestImportFullClientData}>
-                  Import Full Client Data
-                </button>
-                <button className="ghost-button data-action-button" type="button" onClick={exportFullClientData}>
-                  Export Full Client Data
-                </button>
-              </div>
-            </section>
 
             <FollowUpTasks
               tasks={followUpTasks}
@@ -519,6 +519,9 @@ function PageNavigation({ currentPage, setCurrentPage }) {
               key={key}
               className={currentPage === key ? 'active' : ''}
               onClick={() => setCurrentPage(key)}
+              onPointerUp={(event) => {
+                if (event.pointerType === 'touch') setCurrentPage(key);
+              }}
             >
               {label}
             </button>
