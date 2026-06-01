@@ -264,14 +264,33 @@ function normalizePolicySummaryPolicyWithReport(policy = {}, index = 0, client =
 export function getPolicyCashValueRetirementAssets(policies = []) {
   return policies
     .filter((policy) => Boolean(policy?.includeCashValueInRetirement) && toNumber(policy?.cashValue) > 0)
-    .map((policy) => ({
+    .map((policy, index) => ({
       id: policy.id,
-      planName: policy.planName || 'Policy',
+      name: getPolicyDisplayName(policy, index),
+      planName: policy.planName || '',
+      policyName: policy.policyName || '',
+      typeOfPlan: policy.typeOfPlan || '',
       company: policy.company || '',
+      policyNumber: policy.policyNumber || '',
+      startAge: toOptionalNumber(policy.policyStartAge) !== '' ? toOptionalNumber(policy.policyStartAge) : toOptionalNumber(policy.ageInception),
       cashValue: toNumber(policy.cashValue),
       currency: getPolicyCurrency(policy),
-      label: `Policy Cash Value - ${policy.planName || 'Policy'}`,
+      label: getPolicyDisplayName(policy, index),
     }));
+}
+
+export function getPolicyDisplayName(policy = {}, index = 0) {
+  const planName = toSafeText(policy.planName).trim();
+  if (planName) return planName;
+  const policyName = toSafeText(policy.policyName || policy.name).trim();
+  if (policyName) return policyName;
+  const typeOfPlan = toSafeText(policy.typeOfPlan).trim();
+  if (typeOfPlan) return typeOfPlan;
+  const company = toSafeText(policy.company).trim();
+  const policyNumber = toSafeText(policy.policyNumber).trim();
+  if (company && policyNumber) return `${company} ${policyNumber}`;
+  if (company) return company;
+  return `Policy ${index + 1}`;
 }
 
 export function calculatePolicyPremium(policy) {

@@ -368,10 +368,17 @@ function buildProjectionSeries({ profile, cpf, srs, policies, policyCashValueAss
   const series = [{ key: 'total', name: 'Total', color: ASSET_COLORS.total }];
   if (hasCpfProjectionData(cpf)) series.push({ key: 'cpf', name: 'CPF', color: ASSET_COLORS.cpf });
   if (srs.enabled) series.push({ key: 'srs', name: 'SRS', color: ASSET_COLORS.srs });
-  const includedPolicyCashValue = sumIncludedPolicyCashValues(policyCashValueAssets);
-  if (includedPolicyCashValue > 0) {
-    series.push({ key: 'policy_cash_values', name: 'Policy cash values', color: ASSET_COLORS.policy });
-  }
+  const policyCashSeries = policyCashValueAssets
+    .filter((asset) => String(asset.currency || 'SGD').toUpperCase() === 'SGD' && Number(asset.cashValue || 0) > 0)
+    .map((asset, index) => ({
+      asset,
+      key: `policy_cash_${asset.id || index}`,
+      name: asset.name || asset.planName || asset.policyName || asset.typeOfPlan || `Policy ${index + 1}`,
+      color: POLICY_COLORS[index % POLICY_COLORS.length],
+    }));
+  policyCashSeries.forEach((item) => {
+    series.push({ key: item.key, name: item.name, color: item.color });
+  });
   policies.forEach((policy, index) => {
     series.push({
       key: `policy_${policy.id}`,
@@ -391,29 +398,46 @@ function buildProjectionSeries({ profile, cpf, srs, policies, policyCashValueAss
     series.push({ key: 'cash', name: 'Cash / Savings', color: ASSET_COLORS.cash });
   }
 
-  const chartData = timeline.map((point) => {
-    const age = Number(point.age);
-    const row = { age, total: point.total };
-    if (hasCpfProjectionData(cpf)) row.cpf = projectCpfAtAge(cpf, profile.currentAge, age);
-    if (srs.enabled) row.srs = projectSrs(srs, Number(profile.currentAge), age);
-    if (includedPolicyCashValue > 0) row.policy_cash_values = includedPolicyCashValue;
+  const currentAge = Number(profile.currentAge);
+  const timelineByAge = new Map(timeline.map((point) => [Number(point.age), point]));
+  const policyStartAges = policyCashSeries
+    .map((item) => Number(item.asset.startAge))
+    .filter((age) => Number.isFinite(age) && age > 0);
+  const firstAge = Math.min(
+    Number.isFinite(currentAge) ? currentAge : Number(timeline[0]?.age || 0),
+    ...policyStartAges,
+  );
+  const lastAge = Number(timeline[timeline.length - 1]?.age || currentAge || firstAge);
+  const ages = Array.from({ length: Math.max(0, lastAge - firstAge + 1) }, (_, index) => firstAge + index);
+
+  const chartData = ages.map((age) => {
+    const point = timelineByAge.get(age);
+    const row = { age, total: point?.total ?? null };
+    if (point && hasCpfProjectionData(cpf)) row.cpf = projectCpfAtAge(cpf, profile.currentAge, age);
+    if (point && srs.enabled) row.srs = projectSrs(srs, Number(profile.currentAge), age);
+    policyCashSeries.forEach((item) => {
+      row[item.key] = getPolicyCashValueAtAge(item.asset, currentAge, age);
+    });
     policies.forEach((policy) => {
-      row[`policy_${policy.id}`] = projectPolicy(policy, Number(profile.currentAge), age, scenarioRate);
+      row[`policy_${policy.id}`] = point ? projectPolicy(policy, Number(profile.currentAge), age, scenarioRate) : null;
     });
     investments.forEach((investment) => {
       if (!investment.includeInTotal) return;
-      row[`investment_${investment.id}`] = projectInvestmentAtAge(investment, Number(profile.currentAge), age, scenarioRate, profile.retirementDuration);
+      row[`investment_${investment.id}`] = point ? projectInvestmentAtAge(investment, Number(profile.currentAge), age, scenarioRate, profile.retirementDuration) : null;
     });
-    if (isCashIncludedInProjection(cash) || Number(point.cash) > 0) row.cash = point.cash;
+    if (point && (isCashIncludedInProjection(cash) || Number(point.cash) > 0)) row.cash = point.cash;
     return row;
   });
 
   return { chartData, series };
 }
 
-function sumIncludedPolicyCashValues(policyCashValueAssets = []) {
-  return policyCashValueAssets.reduce((sum, asset) => {
-    const isSgd = String(asset.currency || 'SGD').toUpperCase() === 'SGD';
-    return isSgd ? sum + Number(asset.cashValue || 0) : sum;
-  }, 0);
+function getPolicyCashValueAtAge(asset, currentAge, age) {
+  const cashValue = Number(asset.cashValue || 0);
+  if (cashValue <= 0) return null;
+  if (String(asset.currency || 'SGD').toUpperCase() !== 'SGD') return null;
+  const startAge = Number(asset.startAge) || Number(currentAge);
+  if (age < startAge || age > currentAge) return null;
+  if (startAge >= currentAge) return age === currentAge ? cashValue : null;
+  return cashValue * ((age - startAge) / (currentAge - startAge));
 }

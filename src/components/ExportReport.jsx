@@ -398,7 +398,7 @@ function calculateCurrentAssets({ cpf, srs, policies, investments, cash, policyC
     policyCashValueAssets.forEach((asset) => {
       const isSgd = String(asset.currency || 'SGD').toUpperCase() === 'SGD';
       rows.push([
-        `${asset.planName}${asset.company ? ` (${asset.company})` : ''}`,
+        `${asset.name || asset.planName || 'Policy'}${asset.company ? ` (${asset.company})` : ''}`,
         formatPolicyCurrencyWithLabel(asset.cashValue, asset.currency),
         isSgd ? 'Included from Policy Summary' : 'Shown separately; not combined without FX conversion',
       ]);

@@ -121,7 +121,7 @@ export function PolicySummary({
       createPolicySummaryPolicy({ planName: 'New Policy', owner: displayClient.clientName || 'Client', lifeAssured: displayClient.clientName || 'Client' }),
       { client: displayClient },
     );
-    setPolicies((current) => [...current, policy]);
+    setPolicies((current) => [policy, ...current]);
     setEditingId(policy.id);
   };
 
@@ -141,7 +141,7 @@ export function PolicySummary({
       createPolicySummaryPolicy({ ...policy, id: crypto.randomUUID(), planName: `${policy.planName || 'Policy'} copy` }),
       { client: displayClient, previousPolicy: policy },
     );
-    setPolicies((current) => [...current, copy]);
+    setPolicies((current) => [copy, ...current]);
     setEditingId(copy.id);
   };
 

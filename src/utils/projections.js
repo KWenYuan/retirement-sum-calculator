@@ -47,10 +47,23 @@ const futureValueWithMonthlyContributions = (currentValue, monthlyContribution, 
   monthlyContributionFutureValue(monthlyContribution, annualRate, years)
 );
 
-const sumIncludedPolicyCashValues = (policyCashValueAssets = []) => (
+const getPolicyCashValueAtAge = (asset = {}, currentAge, targetAge) => {
+  const isSgd = String(asset.currency || 'SGD').toUpperCase() === 'SGD';
+  if (!isSgd) return 0;
+  const cashValue = asNumber(asset.cashValue);
+  if (cashValue <= 0) return 0;
+  const current = asNumber(currentAge);
+  const age = asNumber(targetAge);
+  const startAge = asNumber(asset.startAge) || current;
+  if (age < startAge || age > current) return 0;
+  if (startAge >= current) return age === current ? cashValue : 0;
+  const progress = (age - startAge) / (current - startAge);
+  return Math.max(0, cashValue * progress);
+};
+
+const sumIncludedPolicyCashValuesAtAge = (policyCashValueAssets = [], currentAge, targetAge) => (
   policyCashValueAssets.reduce((total, asset) => {
-    const isSgd = String(asset.currency || 'SGD').toUpperCase() === 'SGD';
-    return isSgd ? total + asNumber(asset.cashValue) : total;
+    return total + getPolicyCashValueAtAge(asset, currentAge, targetAge);
   }, 0)
 );
 
@@ -462,7 +475,7 @@ export const calculateAtAge = ({ profile, cpf, srs, policies = [], policyCashVal
   const policyValue = policies.reduce(
     (total, policy) => total + projectPolicy(policy, asNumber(profile.currentAge), asNumber(age), scenarioRate),
     0,
-  ) + sumIncludedPolicyCashValues(policyCashValueAssets);
+  ) + sumIncludedPolicyCashValuesAtAge(policyCashValueAssets, profile.currentAge, age);
   const investmentValue = investments.reduce((total, investment) => (
     total + (investment.includeInTotal ? projectInvestmentAtAge(investment, profile.currentAge, age, scenarioRate, profile.retirementDuration) : 0)
   ), 0);
@@ -837,15 +850,14 @@ export const startLaterComparison = (state) => {
       )
     ), 0);
     const stableValue = calculateAtAge({ ...state, investments: [], policies: [], policyCashValueAssets: [], age: state.profile.retirementAge }).total;
-    const policyCashValue = sumIncludedPolicyCashValues(state.policyCashValueAssets);
     const delayedValue = stableValue + delayedInvestmentValue + delayedPolicyValue;
     const contributionYearsLost = delay === 0 ? 0 : Math.min(delay, Math.max(0, state.profile.retirementAge - state.profile.currentAge));
     const catchUpLabel = delay === 0 ? 'Start now' : `Start ${delay} years later`;
     return {
       label: catchUpLabel,
       delay,
-      value: delayedValue + policyCashValue,
-      difference: delayedValue + policyCashValue - base,
+      value: delayedValue,
+      difference: delayedValue - base,
       contributionYearsLost,
     };
   });

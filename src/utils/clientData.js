@@ -279,11 +279,16 @@ function sanitizePolicies(policies = []) {
 function sanitizePolicyCashValueAssets(policyCashValueAssets = []) {
   return policyCashValueAssets.map((asset) => ({
     id: asset.id,
+    name: asset.name || asset.planName || 'Policy',
     planName: asset.planName || 'Policy',
+    policyName: asset.policyName || '',
+    typeOfPlan: asset.typeOfPlan || '',
     company: asset.company || '',
+    policyNumber: asset.policyNumber || '',
+    startAge: asset.startAge ?? '',
     cashValue: asset.cashValue,
     currency: asset.currency || 'SGD',
-    label: asset.label || `Policy Cash Value - ${asset.planName || 'Policy'}`,
+    label: asset.label || asset.name || `Policy Cash Value - ${asset.planName || 'Policy'}`,
   }));
 }
 
