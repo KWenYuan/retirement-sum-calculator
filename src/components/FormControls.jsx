@@ -1,9 +1,11 @@
-export function NumberField({ label, value, onChange, prefix, suffix, step = 1, min = 0 }) {
+export function NumberField({ label, value, onChange, prefix, suffix, step = 1, min = 0, readOnly = false }) {
   const handleChange = (event) => {
+    if (readOnly) return;
     onChange(event.target.value);
   };
 
   const handleBlur = (event) => {
+    if (readOnly) return;
     const nextValue = event.target.value;
 
     if (nextValue === '') {
@@ -27,6 +29,7 @@ export function NumberField({ label, value, onChange, prefix, suffix, step = 1, 
           value={value ?? ''}
           onChange={handleChange}
           onBlur={handleBlur}
+          readOnly={readOnly}
         />
         {suffix && <b>{suffix}</b>}
       </div>

@@ -500,6 +500,12 @@ button {
   white-space: nowrap;
 }
 
+.input-shell input[readonly] {
+  color: var(--navy);
+  background: #f3f6fa;
+  cursor: default;
+}
+
 .section-header {
   display: flex;
   align-items: center;
@@ -3039,11 +3045,13 @@ textarea:focus {
 
 .policy-summary-table tbody tr.coverage-row th,
 .policy-summary-table tbody tr.coverage-row td {
-  background: #edf7ef;
+  background: var(--benefit-tint, #edf7ef);
 }
 
 .policy-summary-table tbody tr.coverage-row th:first-child {
-  background: #dff0e3;
+  color: var(--benefit-color, var(--navy));
+  background: color-mix(in srgb, var(--benefit-color, var(--navy)) 18%, white);
+  border-left: 4px solid var(--benefit-color, var(--navy));
 }
 
 .policy-summary-grid {
@@ -3223,32 +3231,12 @@ textarea:focus {
   background: var(--gold);
 }
 
-.policy-timeline-bar.coverage {
-  top: 32px;
-  background: var(--navy);
-}
-
 .policy-timeline-bar.benefit {
   height: 10px;
   padding: 0 6px;
   color: #ffffff;
   font-size: 8px;
   line-height: 10px;
-}
-
-.policy-timeline-bar.benefit-1 {
-  top: 55px;
-  background: #6f56d9;
-}
-
-.policy-timeline-bar.benefit-2 {
-  top: 66px;
-  background: #4f86c6;
-}
-
-.policy-timeline-bar.benefit-3 {
-  top: 77px;
-  background: #77869a;
 }
 
 .policy-timeline-row.lapsed .policy-timeline-bar {
@@ -3610,11 +3598,13 @@ textarea:focus {
 
 .policy-export-table tbody tr.coverage-row th,
 .policy-export-table tbody tr.coverage-row td {
-  background: #edf7ef;
+  background: var(--benefit-tint, #edf7ef);
 }
 
 .policy-export-table tbody tr.coverage-row th:first-child {
-  background: #dff0e3;
+  color: var(--benefit-color, var(--navy));
+  background: color-mix(in srgb, var(--benefit-color, var(--navy)) 18%, white);
+  border-left: 3px solid var(--benefit-color, var(--navy));
 }
 
 .policy-export-timeline table {
@@ -3678,12 +3668,8 @@ textarea:focus {
   background: var(--gold);
 }
 
-.policy-timeline-pdf-heading i.coverage {
-  background: var(--navy);
-}
-
 .policy-timeline-pdf-heading i.benefit {
-  background: #6f56d9;
+  background: var(--navy);
 }
 
 .policy-timeline-pdf svg {

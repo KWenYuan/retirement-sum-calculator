@@ -65,6 +65,7 @@ const numberFields = [
 
 const ageFields = [
   'ageInception',
+  'policyStartAge',
   'premiumPayableStartAge',
   'premiumPayableEndAge',
   'premiumPayableDuration',
@@ -76,10 +77,32 @@ const ageFields = [
 
 const premiumFrequencyOptions = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Single Premium', 'Unknown'];
 const premiumPayableTypeOptions = ['Fixed term', 'To age', 'Whole life / ongoing', 'Single premium', 'Fully paid', 'Unknown'];
-const coverageTypeOptions = ['Fixed term', 'To age', 'Whole life / lifetime', 'Yearly renewable', 'To maturity', 'Unknown'];
 const policyStatusOptions = ['In-force', 'Lapsed', 'Matured', 'Cancelled', 'Pending', 'Paid-up', 'Unknown'];
 const coverageStatusOptions = ['Active', 'Ended', 'Pending', 'Unknown'];
 const payStatusOptions = ['Paying', 'Fully paid', 'Waived', 'Lapsed', 'In-force', 'Unknown'];
+
+export const premiumTimelineColor = '#c49a43';
+
+export const benefitColorMap = {
+  death: '#15345f',
+  tpd: '#4d7ea8',
+  eci: '#7b61a8',
+  ci: '#b84a62',
+  hospitalisation: '#2f855a',
+  disabilityIncome: '#d97706',
+  deathAccident: '#c49a43',
+  tpdAccident: '#f59e0b',
+  medicalReimbursementAccident: '#0f766e',
+  hospitalIncome: '#9a5a2e',
+};
+
+export function getBenefitColor(benefitKey) {
+  return benefitColorMap[benefitKey] || '#77869a';
+}
+
+export function getBenefitTint(benefitKey) {
+  return `${getBenefitColor(benefitKey)}14`;
+}
 
 export const benefitCoverageDefinitions = [
   { key: 'death', label: 'Death', amountField: 'deathBenefit', type: 'currency' },
@@ -108,6 +131,7 @@ const createBasePolicySummaryPolicy = (overrides = {}) => ({
   policyStatus: 'In-force',
   startDate: '',
   ageInception: '',
+  policyStartAge: '',
   currency: 'SGD',
   owner: 'Client',
   lifeAssured: 'Client',
@@ -133,7 +157,7 @@ const createBasePolicySummaryPolicy = (overrides = {}) => ({
   coverageStartAge: '',
   coverageEndAge: '',
   coverageDuration: '',
-  coverageType: 'Fixed term',
+  coverageType: '',
   coverageStatus: 'Active',
   remarks: '',
   maturityDate: '',
@@ -156,11 +180,11 @@ export const createPolicySummaryPolicy = (overrides = {}) => (
   normalizePolicySummaryPolicy(createBasePolicySummaryPolicy(overrides))
 );
 
-export function normalizePolicySummaryPolicy(policy = {}, index = 0) {
-  return normalizePolicySummaryPolicyWithReport(policy, index).policy;
+export function normalizePolicySummaryPolicy(policy = {}, index = 0, client = {}) {
+  return normalizePolicySummaryPolicyWithReport(policy, index, client).policy;
 }
 
-function normalizePolicySummaryPolicyWithReport(policy = {}, index = 0) {
+function normalizePolicySummaryPolicyWithReport(policy = {}, index = 0, client = {}) {
   const source = isPlainObject(policy) ? policy : {};
   const defaults = createBasePolicySummaryPolicy({ id: `policy-summary-${index + 1}` });
   const normalized = { ...defaults };
@@ -188,6 +212,9 @@ function normalizePolicySummaryPolicyWithReport(policy = {}, index = 0) {
     }
     normalized[field] = normalizedAge;
   });
+  if (!Object.prototype.hasOwnProperty.call(source, 'ageInception') && Object.prototype.hasOwnProperty.call(source, 'policyStartAge')) {
+    normalized.ageInception = normalized.policyStartAge;
+  }
   normalized.includeCashValueInRetirement = Boolean(source.includeCashValueInRetirement);
 
   normalized.currency = normalized.currency || 'SGD';
@@ -199,11 +226,6 @@ function normalizePolicySummaryPolicyWithReport(policy = {}, index = 0) {
   normalized.premiumPayableType = normalizeOption(
     Object.prototype.hasOwnProperty.call(source, 'premiumPayableType') ? normalized.premiumPayableType : 'Unknown',
     premiumPayableTypeOptions,
-    'Unknown',
-  );
-  normalized.coverageType = normalizeOption(
-    Object.prototype.hasOwnProperty.call(source, 'coverageType') ? normalized.coverageType : 'Unknown',
-    coverageTypeOptions,
     'Unknown',
   );
   normalized.policyStatus = normalizeOption(
@@ -230,12 +252,13 @@ function normalizePolicySummaryPolicyWithReport(policy = {}, index = 0) {
       normalized[definition.amountField] = toNumber(normalized.benefits[definition.key]?.amount);
     }
   });
+  const policyWithCalculatedAges = applyPolicySummaryCalculatedAges(normalized, { client });
 
-  ['premiumFrequency', 'premiumPayableType', 'coverageType', 'policyStatus', 'coverageStatus', 'payStatus'].forEach((field) => {
+  ['premiumFrequency', 'premiumPayableType', 'policyStatus', 'coverageStatus', 'payStatus'].forEach((field) => {
     if (source[field] && normalized[field] === 'Unknown' && source[field] !== 'Unknown') cleanedFields.push(field);
   });
 
-  return { policy: normalized, cleanedFields };
+  return { policy: policyWithCalculatedAges, cleanedFields };
 }
 
 export function getPolicyCashValueRetirementAssets(policies = []) {
@@ -460,46 +483,54 @@ export function getPremiumPeriod(policy) {
   return unknownPremiumPeriod();
 }
 
-export function getCoveragePeriod(policy) {
-  const type = policy?.coverageType || 'Unknown';
-  const start = toOptionalNumber(policy?.coverageStartAge || policy?.ageInception);
-  const end = toOptionalNumber(policy?.coverageEndAge);
-  if (type === 'Whole life / lifetime') return hasValidAge(start) ? { label: `Age ${start}-Lifetime`, startAge: start, endAge: 99, hasBar: true, isLifetime: true } : unknownCoveragePeriod();
-  if (type === 'Yearly renewable') return hasValidAge(start) ? { label: `Age ${start}-Review yearly`, startAge: start, endAge: 99, hasBar: true, isLifetime: true } : unknownCoveragePeriod();
-  if (type === 'To maturity') return hasValidAge(start) && hasValidAge(end) ? { label: `Age ${start}-${end}`, startAge: start, endAge: end, hasBar: true } : unknownCoveragePeriod();
-  if (type === 'Unknown') return unknownCoveragePeriod();
-  if (hasValidAge(start) && hasValidAge(end)) return { label: `Age ${start}-${end}`, startAge: start, endAge: end, hasBar: true };
-  if (hasValidAge(start) && toOptionalNumber(policy.coverageDuration) !== '') {
-    const durationEnd = start + toNumber(policy.coverageDuration);
-    return { label: `Age ${start}-${durationEnd}`, startAge: start, endAge: durationEnd, hasBar: true };
-  }
-  return unknownCoveragePeriod();
+export function calculateAgeAtDate(dateOfBirth, targetDate) {
+  const birthDate = parseDisplayDate(toSafeText(dateOfBirth).trim());
+  const date = parseDisplayDate(toSafeText(targetDate).trim());
+  if (!birthDate || !date || date < birthDate) return '';
+  let age = date.getFullYear() - birthDate.getFullYear();
+  const birthdayThisYear = new Date(date.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+  if (date < birthdayThisYear) age -= 1;
+  return age >= 0 ? age : '';
+}
+
+export function applyPolicySummaryCalculatedAges(policy = {}, { client = {}, previousPolicy = null } = {}) {
+  const previousStartAge = toOptionalNumber(previousPolicy?.ageInception);
+  const calculatedStartAge = calculateAgeAtDate(client?.dateOfBirth, policy?.startDate);
+  const ageInception = calculatedStartAge !== '' ? calculatedStartAge : '';
+  let nextPolicy = {
+    ...policy,
+    ageInception,
+    policyStartAge: ageInception,
+    coverageStartAge: ageInception,
+  };
+  const benefits = benefitCoverageDefinitions.reduce((items, definition) => {
+    const currentBenefit = nextPolicy.benefits?.[definition.key] || nextPolicy.benefitCoveragePeriods?.[definition.key] || {};
+    const previousBenefit = previousPolicy?.benefits?.[definition.key] || previousPolicy?.benefitCoveragePeriods?.[definition.key] || {};
+    const previousBenefitStart = toOptionalNumber(previousBenefit.startAge);
+    return {
+      ...items,
+      [definition.key]: {
+        ...currentBenefit,
+        startAge: defaultAgeValue(currentBenefit.startAge, previousBenefitStart || previousStartAge, ageInception),
+        endAge: toOptionalNumber(currentBenefit.endAge),
+      },
+    };
+  }, {});
+  return {
+    ...nextPolicy,
+    benefits,
+    benefitCoveragePeriods: benefits,
+  };
 }
 
 export function getBenefitCoverageDifferences(policy) {
-  const mainCoverage = getCoveragePeriod(policy);
-  if (!mainCoverage.hasBar || !hasValidAge(mainCoverage.startAge) || !hasValidAge(mainCoverage.endAge)) return [];
-  return benefitCoverageDefinitions
-    .map((definition) => {
-      const period = getBenefitCoveragePeriod(policy, definition, mainCoverage);
-      return period;
-    })
-    .filter(Boolean)
-    .filter((period) => period.differsFromMain);
+  return getBenefitCoverageDetails(policy).filter((period) => period.hasBar);
 }
 
 export function getBenefitCoverageDetails(policy) {
-  const mainCoverage = getCoveragePeriod(policy);
   return benefitCoverageDefinitions
     .filter((definition) => hasBenefitValue(policy, definition))
-    .map((definition) => getBenefitCoveragePeriod(policy, definition, mainCoverage) || {
-      key: definition.key,
-      label: definition.label,
-      amountDisplay: formatBenefitAmount(policy, definition),
-      periodLabel: mainCoverage.hasBar ? 'Uses main coverage period' : 'Coverage period unknown',
-      hasBar: false,
-      differsFromMain: false,
-    });
+    .map((definition) => getBenefitCoveragePeriod(policy, definition));
 }
 
 export function getBenefitAmount(policy, benefitKey) {
@@ -527,6 +558,16 @@ export function formatDisplayDate(value) {
   return `${day}-${month}-${year}`;
 }
 
+function defaultAgeValue(currentValue, previousDefault, nextDefault) {
+  const current = toOptionalNumber(currentValue);
+  const previous = toOptionalNumber(previousDefault);
+  const next = toOptionalNumber(nextDefault);
+  if (!hasValidAge(next)) return current;
+  if (current === '') return next;
+  if (hasValidAge(previous) && current === previous) return next;
+  return current;
+}
+
 export function buildPolicySummaryPayload(data) {
   return {
     appName: POLICY_SUMMARY_APP_NAME,
@@ -535,13 +576,13 @@ export function buildPolicySummaryPayload(data) {
     exportedAt: new Date().toISOString(),
     data: {
       clientDetails: data.client,
-      policySummaryPolicies: (data.policies || []).map((policy, index) => normalizePolicySummaryPolicy(policy, index)),
+      policySummaryPolicies: (data.policies || []).map((policy, index) => normalizePolicySummaryPolicy(policy, index, data.client)),
       benchmarkAssumptions: data.benchmark,
       notes: data.notes,
       reviewDate: data.client?.reviewDate,
       policyTimelineSettings: {
         premiumBar: 'Premium Payable',
-        coverageBar: 'Coverage Period',
+        benefitBars: 'Benefit-specific coverage periods',
       },
     },
   };
@@ -565,11 +606,11 @@ export function restorePolicySummaryData(data = {}) {
   const importReport = { policyCount: 0, cleanedPolicies: 0 };
   const policies = Array.isArray(policyData)
     ? policyData.map((policy, index) => {
-      const normalized = normalizePolicySummaryPolicyWithReport(policy, index);
+      const normalized = normalizePolicySummaryPolicyWithReport(policy, index, clientData);
       if (normalized.cleanedFields.length > 0) importReport.cleanedPolicies += 1;
       return normalized.policy;
     })
-    : [createPolicySummaryPolicy({
+    : [normalizePolicySummaryPolicy(createPolicySummaryPolicy({
       company: 'AIA',
       typeOfPlan: 'Investment-linked',
       planName: 'AIA Pro Achiever III',
@@ -579,10 +620,9 @@ export function restorePolicySummaryData(data = {}) {
       premiumPayableEndAge: 40,
       coverageStartAge: 30,
       coverageEndAge: 99,
-      coverageType: 'Whole life / lifetime',
       deathBenefit: 100000,
       ciBenefit: 50000,
-    })];
+    }), 0, clientData)];
   importReport.policyCount = policies.length;
   return {
     client: { ...defaultPolicySummaryClient, ...clientData },
@@ -739,10 +779,6 @@ function unknownPremiumPeriod() {
   return { label: 'Premium period unknown', startAge: '', endAge: '', hasBar: false };
 }
 
-function unknownCoveragePeriod() {
-  return { label: 'Coverage period unknown', startAge: '', endAge: '', hasBar: false };
-}
-
 function normalizeBenefits(periods = {}, policy = {}, legacyPeriods = {}) {
   const source = isPlainObject(periods) ? periods : {};
   const legacySource = isPlainObject(legacyPeriods) ? legacyPeriods : {};
@@ -769,18 +805,15 @@ function normalizeBenefits(periods = {}, policy = {}, legacyPeriods = {}) {
   }, {});
 }
 
-function getBenefitCoveragePeriod(policy, definition, mainCoverage) {
+function getBenefitCoveragePeriod(policy, definition) {
   if (!hasBenefitValue(policy, definition)) return null;
   const rawPeriod = policy?.benefits?.[definition.key] || policy?.benefitCoveragePeriods?.[definition.key] || {};
   const startAge = toOptionalNumber(rawPeriod.startAge);
   const endAge = toOptionalNumber(rawPeriod.endAge);
-  const hasSpecificPeriod = hasValidAge(startAge) && hasValidAge(endAge);
-  const effectiveStartAge = hasSpecificPeriod ? startAge : mainCoverage.startAge;
-  const effectiveEndAge = hasSpecificPeriod ? endAge : mainCoverage.endAge;
+  const policyStartAge = toOptionalNumber(policy?.ageInception);
+  const effectiveStartAge = hasValidAge(startAge) ? startAge : policyStartAge;
+  const effectiveEndAge = endAge;
   const hasBar = hasValidAge(effectiveStartAge) && hasValidAge(effectiveEndAge);
-  const differsFromMain = hasSpecificPeriod && hasBar && (
-    effectiveStartAge !== mainCoverage.startAge || effectiveEndAge !== mainCoverage.endAge
-  );
   return {
     key: definition.key,
     label: definition.label,
@@ -788,8 +821,13 @@ function getBenefitCoveragePeriod(policy, definition, mainCoverage) {
     startAge: effectiveStartAge,
     endAge: effectiveEndAge,
     hasBar,
-    differsFromMain,
-    periodLabel: hasSpecificPeriod ? `Age ${startAge}-${endAge}` : 'Uses main coverage period',
+    differsFromMain: false,
+    color: getBenefitColor(definition.key),
+    periodLabel: hasBar
+      ? `Age ${effectiveStartAge}-${effectiveEndAge}`
+      : hasValidAge(effectiveStartAge)
+        ? `Starts age ${effectiveStartAge}; end age not set`
+        : 'Coverage ages not set',
   };
 }
 
@@ -817,8 +855,28 @@ function normalizeBenefitAmount(value, definition) {
 }
 
 function parseDisplayDate(text) {
+  const monthNames = {
+    jan: 1,
+    feb: 2,
+    mar: 3,
+    apr: 4,
+    may: 5,
+    jun: 6,
+    jul: 7,
+    aug: 8,
+    sep: 9,
+    sept: 9,
+    oct: 10,
+    nov: 11,
+    dec: 12,
+  };
   const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (isoMatch) return buildDate(isoMatch[1], isoMatch[2], isoMatch[3]);
+  const displayMatch = text.match(/^(\d{1,2})[-\s]([a-zA-Z]{3,4})[-\s](\d{4})$/);
+  if (displayMatch) {
+    const month = monthNames[displayMatch[2].toLowerCase()];
+    if (month) return buildDate(displayMatch[3], month, displayMatch[1]);
+  }
   const slashMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (slashMatch) return buildDate(slashMatch[3], slashMatch[2], slashMatch[1]);
   const dashMatch = text.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);

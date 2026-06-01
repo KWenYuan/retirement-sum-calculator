@@ -20,6 +20,7 @@ export function buildReviewSnapshot(state) {
     cpf: state.cpf,
     srs: state.srs,
     policies: state.policies || [],
+    policyCashValueAssets: state.policyCashValueAssets || [],
     investments: state.investments || [],
     cash: state.cash,
     scenarioRate,

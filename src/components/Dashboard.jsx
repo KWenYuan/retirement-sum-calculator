@@ -31,6 +31,7 @@ export function Dashboard({
   cpf,
   srs,
   policies,
+  policyCashValueAssets = [],
   investments,
   cash,
   scenarioRate,
@@ -58,8 +59,8 @@ export function Dashboard({
   const [chartView, setChartView] = useState('total-components');
   const [highlightedSeries, setHighlightedSeries] = useState(null);
   const { chartData, series } = useMemo(
-    () => buildProjectionSeries({ profile, cpf, srs, policies, investments, cash, scenarioRate, timeline }),
-    [profile, cpf, srs, policies, investments, cash, scenarioRate, timeline],
+    () => buildProjectionSeries({ profile, cpf, srs, policies, policyCashValueAssets, investments, cash, scenarioRate, timeline }),
+    [profile, cpf, srs, policies, policyCashValueAssets, investments, cash, scenarioRate, timeline],
   );
   const visibleSeries = series.filter((item) => {
     if (chartView === 'total') return item.key === 'total';
@@ -69,7 +70,7 @@ export function Dashboard({
   const breakdownData = [
     ...(hasCpfProjectionData(cpf) ? [{ name: 'CPF', value: selectedBreakdown.cpf }] : []),
     { name: 'SRS', value: selectedBreakdown.srs },
-    { name: 'Policies', value: selectedBreakdown.policies },
+    { name: 'Policy cash values', value: selectedBreakdown.policies },
     { name: 'Investments', value: selectedBreakdown.investments },
     { name: 'Cash', value: selectedBreakdown.cash },
   ].filter((item) => item.value > 0);
@@ -363,10 +364,14 @@ function updateSelectedAgeFromChart(state, setSelectedAge) {
   if (Number.isFinite(nextAge)) setSelectedAge(nextAge);
 }
 
-function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash, scenarioRate, timeline }) {
+function buildProjectionSeries({ profile, cpf, srs, policies, policyCashValueAssets = [], investments, cash, scenarioRate, timeline }) {
   const series = [{ key: 'total', name: 'Total', color: ASSET_COLORS.total }];
   if (hasCpfProjectionData(cpf)) series.push({ key: 'cpf', name: 'CPF', color: ASSET_COLORS.cpf });
   if (srs.enabled) series.push({ key: 'srs', name: 'SRS', color: ASSET_COLORS.srs });
+  const includedPolicyCashValue = sumIncludedPolicyCashValues(policyCashValueAssets);
+  if (includedPolicyCashValue > 0) {
+    series.push({ key: 'policy_cash_values', name: 'Policy cash values', color: ASSET_COLORS.policy });
+  }
   policies.forEach((policy, index) => {
     series.push({
       key: `policy_${policy.id}`,
@@ -391,6 +396,7 @@ function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash,
     const row = { age, total: point.total };
     if (hasCpfProjectionData(cpf)) row.cpf = projectCpfAtAge(cpf, profile.currentAge, age);
     if (srs.enabled) row.srs = projectSrs(srs, Number(profile.currentAge), age);
+    if (includedPolicyCashValue > 0) row.policy_cash_values = includedPolicyCashValue;
     policies.forEach((policy) => {
       row[`policy_${policy.id}`] = projectPolicy(policy, Number(profile.currentAge), age, scenarioRate);
     });
@@ -403,4 +409,11 @@ function buildProjectionSeries({ profile, cpf, srs, policies, investments, cash,
   });
 
   return { chartData, series };
+}
+
+function sumIncludedPolicyCashValues(policyCashValueAssets = []) {
+  return policyCashValueAssets.reduce((sum, asset) => {
+    const isSgd = String(asset.currency || 'SGD').toUpperCase() === 'SGD';
+    return isSgd ? sum + Number(asset.cashValue || 0) : sum;
+  }, 0);
 }

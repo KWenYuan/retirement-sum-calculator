@@ -4,7 +4,11 @@ import { Copy, Download, FileJson, FolderUp, Pencil, Plus, Trash2 } from 'lucide
 import { NumberField, SelectField, TextField, Toggle } from './FormControls.jsx';
 import { PolicySummaryExportReport } from './PolicySummaryExportReport.jsx';
 import {
+  applyPolicySummaryCalculatedAges,
   benefitCoverageDefinitions,
+  getBenefitColor,
+  getBenefitTint,
+  premiumTimelineColor,
   calculatePolicyPremium,
   calculatePolicyTablePremiumTotalsByCurrency,
   calculatePolicySummary,
@@ -20,9 +24,7 @@ import {
   formatPolicyTimelinePremium,
   getBenefitAmountDisplay,
   getBenefitCoverageDetails,
-  getBenefitCoverageDifferences,
   getPolicyTablePremiumValues,
-  getCoveragePeriod,
   getPremiumPeriod,
   importPolicySummaryData,
   loadPolicySummaryFromStorage,
@@ -37,8 +39,6 @@ const policyStatuses = ['In-force', 'Lapsed', 'Matured', 'Cancelled', 'Pending',
 const payStatuses = ['Paying', 'Fully paid', 'Waived', 'Lapsed', 'In-force', 'Unknown'];
 const coverageStatuses = ['Active', 'Ended', 'Pending', 'Unknown'];
 const premiumPayableTypes = ['Fixed term', 'To age', 'Whole life / ongoing', 'Single premium', 'Fully paid', 'Unknown'];
-const coverageTypes = ['Fixed term', 'To age', 'Whole life / lifetime', 'Yearly renewable', 'To maturity', 'Unknown'];
-
 const policyRows = [
   { label: 'Company', get: (policy) => textValue(policy.company) },
   { label: 'Policy No.', get: (policy) => textValue(policy.policyNumber) },
@@ -48,16 +48,16 @@ const policyRows = [
   { label: 'Monthly Premium', totalKey: 'monthlyPremium', premiumTableTotal: true, get: (policy) => getPolicyTablePremiumValues(policy).monthlyDisplay },
   { label: 'Annual Premium', totalKey: 'annualPremium', premiumTableTotal: true, get: (policy) => getPolicyTablePremiumValues(policy).annualDisplay },
   { label: 'Premium Payable Period', get: (policy) => getPremiumPeriod(policy).label },
-  { label: 'Death', totalKey: 'death', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'death') },
-  { label: 'TPD', totalKey: 'tpd', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpd') },
-  { label: 'ECI', totalKey: 'eci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'eci') },
-  { label: 'CI', totalKey: 'ci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'ci') },
-  { label: 'Hospitalisation', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalisation') },
-  { label: 'Disability Income', totalKey: 'disabilityIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'disabilityIncome') },
-  { label: 'Death (Accident)', totalKey: 'deathAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'deathAccident') },
-  { label: 'TPD (Accident)', totalKey: 'tpdAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpdAccident') },
-  { label: 'Medical Reimbursement (Accident)', totalKey: 'medicalReimbursementAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'medicalReimbursementAccident') },
-  { label: 'Hospital Income', totalKey: 'hospitalIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalIncome') },
+  { label: 'Death', totalKey: 'death', benefitKey: 'death', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'death') },
+  { label: 'TPD', totalKey: 'tpd', benefitKey: 'tpd', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpd') },
+  { label: 'ECI', totalKey: 'eci', benefitKey: 'eci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'eci') },
+  { label: 'CI', totalKey: 'ci', benefitKey: 'ci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'ci') },
+  { label: 'Hospitalisation', benefitKey: 'hospitalisation', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalisation') },
+  { label: 'Disability Income', totalKey: 'disabilityIncome', benefitKey: 'disabilityIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'disabilityIncome') },
+  { label: 'Death (Accident)', totalKey: 'deathAccident', benefitKey: 'deathAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'deathAccident') },
+  { label: 'TPD (Accident)', totalKey: 'tpdAccident', benefitKey: 'tpdAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpdAccident') },
+  { label: 'Medical Reimbursement (Accident)', totalKey: 'medicalReimbursementAccident', benefitKey: 'medicalReimbursementAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'medicalReimbursementAccident') },
+  { label: 'Hospital Income', totalKey: 'hospitalIncome', benefitKey: 'hospitalIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalIncome') },
   { label: 'Notes', get: (policy) => textValue(policy.notes) },
 ];
 
@@ -106,20 +106,41 @@ export function PolicySummary({
     onDataChange?.(dataState);
   }, [dataState, onDataChange]);
 
+  useEffect(() => {
+    setPolicies((current) => {
+      const nextPolicies = current.map((policy) => applyPolicySummaryCalculatedAges(policy, {
+        client: displayClient,
+        previousPolicy: policy,
+      }));
+      return arePoliciesEquivalent(current, nextPolicies) ? current : nextPolicies;
+    });
+  }, [displayClient.dateOfBirth]);
+
   const addPolicy = () => {
-    const policy = createPolicySummaryPolicy({ planName: 'New Policy', owner: displayClient.clientName || 'Client', lifeAssured: displayClient.clientName || 'Client' });
+    const policy = applyPolicySummaryCalculatedAges(
+      createPolicySummaryPolicy({ planName: 'New Policy', owner: displayClient.clientName || 'Client', lifeAssured: displayClient.clientName || 'Client' }),
+      { client: displayClient },
+    );
     setPolicies((current) => [...current, policy]);
     setEditingId(policy.id);
   };
 
   const updatePolicy = (id, key, value) => {
     setPolicies((current) => current.map((policy) => (
-      policy.id === id ? normalizePolicyPremiumFields({ ...policy, [key]: value }, key) : policy
+      policy.id === id
+        ? applyPolicySummaryCalculatedAges(
+          normalizePolicyPremiumFields({ ...policy, [key]: value }, key),
+          { client: displayClient, previousPolicy: policy },
+        )
+        : policy
     )));
   };
 
   const duplicatePolicy = (policy) => {
-    const copy = createPolicySummaryPolicy({ ...policy, id: crypto.randomUUID(), planName: `${policy.planName || 'Policy'} copy` });
+    const copy = applyPolicySummaryCalculatedAges(
+      createPolicySummaryPolicy({ ...policy, id: crypto.randomUUID(), planName: `${policy.planName || 'Policy'} copy` }),
+      { client: displayClient, previousPolicy: policy },
+    );
     setPolicies((current) => [...current, copy]);
     setEditingId(copy.id);
   };
@@ -340,9 +361,10 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
               <TextField label="Plan name" value={policy.planName} onChange={(value) => updatePolicy(policy.id, 'planName', value)} />
               <SelectField label="Policy status" value={policy.policyStatus} onChange={(value) => updatePolicy(policy.id, 'policyStatus', value)} options={policyStatuses} />
               <TextField label="Start date" value={policy.startDate} onChange={(value) => updatePolicy(policy.id, 'startDate', value)} />
-              <NumberField label="Policy start age" value={policy.ageInception} onChange={(value) => updatePolicy(policy.id, 'ageInception', value)} />
+              <NumberField label="Policy start age" value={policy.ageInception} onChange={() => {}} readOnly />
               <TextField label="Currency" value={policy.currency} onChange={(value) => updatePolicy(policy.id, 'currency', value)} />
             </div>
+            <p className="field-helper">Policy start age is calculated from the client date of birth and policy start date.</p>
           </details>
           <details className="advanced-block" open>
             <summary>Premium Details</summary>
@@ -419,7 +441,6 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
               </div>
               <div className="form-grid compact input-compact-grid">
                 <TextField label="Other benefits" value={policy.otherBenefits} onChange={(value) => updatePolicy(policy.id, 'otherBenefits', value)} />
-                <SelectField label="Coverage type" value={policy.coverageType} onChange={(value) => updatePolicy(policy.id, 'coverageType', value)} options={coverageTypes} />
               </div>
             </div>
           </details>
@@ -549,7 +570,14 @@ function PolicySummaryTable({ policies, summary }) {
       </thead>
       <tbody>
         {policyRows.map((row) => (
-          <tr key={row.label} className={row.highlight ? 'coverage-row' : ''}>
+          <tr
+            key={row.label}
+            className={row.highlight ? 'coverage-row' : ''}
+            style={row.benefitKey ? {
+              '--benefit-color': getBenefitColor(row.benefitKey),
+              '--benefit-tint': getBenefitTint(row.benefitKey),
+            } : undefined}
+          >
             <th>{row.label}</th>
             {policies.map((policy) => <td key={`${policy.id}-${row.label}`}>{row.get(policy)}</td>)}
             <td>
@@ -569,7 +597,12 @@ function PolicySummaryTable({ policies, summary }) {
 }
 
 function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
-  const periods = policies.flatMap((policy) => [getPremiumPeriod(policy), getCoveragePeriod(policy), ...getBenefitCoverageDifferences(policy)])
+  const policyTimelineRows = policies.map((policy) => ({
+    policy,
+    premium: getPremiumPeriod(policy),
+    benefits: getBenefitCoverageDetails(policy).filter((period) => period.hasBar),
+  }));
+  const periods = policyTimelineRows.flatMap((row) => [row.premium, ...row.benefits])
     .filter((period) => period.hasBar);
   const minAge = periods.length > 0
     ? Math.max(0, Math.floor(Math.min(...periods.map((period) => period.startAge)) / 5) * 5)
@@ -599,17 +632,15 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
       </div>
       <div className="policy-timeline-legend">
         <span><i className="premium" /> Premium Payable</span>
-        <span><i className="coverage" /> Coverage Period</span>
+        <span><i className="benefit" /> Benefit Coverage</span>
         <span><b className="fully-paid">Fully Paid</b></span>
         <span><b className="ended">Expired / Ended</b></span>
         <span><b className="lapsed">Lapsed</b></span>
       </div>
       <div className="policy-timeline-shared">
         <div className="policy-timeline-list">
-          {policies.map((policy) => {
-            const premium = getPremiumPeriod(policy);
-            const coverage = getCoveragePeriod(policy);
-            const benefitDifferences = getBenefitCoverageDifferences(policy);
+          {policyTimelineRows.map(({ policy, premium, benefits }) => {
+            const trackHeight = Math.max(50, 36 + (benefits.length * 16));
             return (
               <button
                 type="button"
@@ -622,7 +653,7 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
                   <span>{policy.company || '-'} | {policy.policyStatus || '-'}</span>
                   <small>{formatPolicyTimelinePremium(policy)}</small>
                 </div>
-                <div className="policy-timeline-track">
+                <div className="policy-timeline-track" style={{ minHeight: trackHeight }}>
                   {ticks.map((tick) => (
                     <span
                       aria-hidden="true"
@@ -632,13 +663,16 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
                     />
                   ))}
                   <TimelineBar period={premium} type="premium" style={premium.hasBar ? toStyle(premium) : {}} />
-                  <TimelineBar period={coverage} type="coverage" style={coverage.hasBar ? toStyle(coverage) : {}} />
-                  {benefitDifferences.slice(0, 3).map((period, index) => (
+                  {benefits.map((period, index) => (
                     <TimelineBar
                       key={`${policy.id}-${period.key}`}
                       period={period}
-                      type={`benefit benefit-${index + 1}`}
-                      style={period.hasBar ? toStyle(period) : {}}
+                      type="benefit"
+                      style={period.hasBar ? {
+                        ...toStyle(period),
+                        top: 34 + (index * 16),
+                        background: getBenefitColor(period.key),
+                      } : {}}
                     />
                   ))}
                 </div>
@@ -663,7 +697,6 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
           <div>
             <SummaryLine label="Policy start date" value={formatDisplayDate(selectedPolicy.startDate)} />
             <SummaryLine label="Premium payable period" value={getPremiumPeriod(selectedPolicy).label} />
-            <SummaryLine label="Main coverage" value={getCoveragePeriod(selectedPolicy).label} />
             {getBenefitCoverageDetails(selectedPolicy).map((benefit) => (
               <SummaryLine
                 key={`${selectedPolicy.id}-${benefit.key}-detail`}
@@ -682,7 +715,7 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
           <tr>
             <th>Policy</th>
             <th>Premium Payable Period</th>
-            <th>Coverage Period</th>
+            <th>Benefit Coverage Periods</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -691,7 +724,7 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
             <tr key={`${policy.id}-timeline-row`}>
               <td>{policy.planName || 'Policy'}</td>
               <td>{getPremiumPeriod(policy).label}</td>
-              <td>{getCoveragePeriod(policy).label}</td>
+              <td>{summarizeBenefitPeriods(policy)}</td>
               <td>{getTimelineStatus(policy)}</td>
             </tr>
           ))}
@@ -713,9 +746,10 @@ function TimelineBar({ period, type, style }) {
   if (!period?.hasBar) {
     return <span className={`timeline-bar-text ${type}`}>{period.label}</span>;
   }
+  const label = type === 'benefit' ? `${period.label}: ${period.periodLabel}` : period.label;
   return (
     <span className={`policy-timeline-bar ${type}`} style={style}>
-      {period.label}
+      {label}
     </span>
   );
 }
@@ -733,6 +767,12 @@ function getStatusClass(policy) {
   if (status.includes('expired') || status.includes('ended')) return 'ended';
   if (status.includes('fully')) return 'fully-paid';
   return 'active';
+}
+
+function summarizeBenefitPeriods(policy) {
+  const benefits = getBenefitCoverageDetails(policy).filter((benefit) => benefit.hasBar);
+  if (benefits.length === 0) return '-';
+  return benefits.map((benefit) => `${benefit.label}: ${benefit.periodLabel}`).join('; ');
 }
 
 function SummaryPill({ label, value }) {
@@ -795,6 +835,10 @@ function normalizePolicyPremiumFields(policy, updatedKey = '') {
   const duration = toLocalNumber(syncedPolicy.premiumPayableDuration);
   if (startAge === '' || duration === '') return syncedPolicy;
   return { ...syncedPolicy, premiumPayableEndAge: startAge + duration };
+}
+
+function arePoliciesEquivalent(first, second) {
+  return JSON.stringify(first) === JSON.stringify(second);
 }
 
 function toLocalNumber(value) {

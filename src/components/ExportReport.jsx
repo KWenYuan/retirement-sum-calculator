@@ -46,7 +46,7 @@ export function ExportReport({
   const assetBreakdown = [
     ...(includeCpf ? [['CPF', retirementPoint.cpf]] : []),
     ['SRS', retirementPoint.srs],
-    ['Investment policies', retirementPoint.policies],
+    ['Policy cash values', retirementPoint.policies],
     ['Personal investments', retirementPoint.investments],
     ...(includeCash ? [['Cash / savings', retirementPoint.cash]] : []),
     ['Total projected retirement amount', retirementPoint.total],
@@ -206,27 +206,29 @@ export function ExportReport({
         <SimpleTable headers={['Age', 'Type', 'Event', 'Amount / Income', 'Duration']} rows={timelineRows} />
       </section>
 
-      <section className="export-section avoid-break">
-        <h2>Policy Maturity / Withdrawal Milestones</h2>
-        <SimpleTable
-          headers={['Policy', 'Structure', 'Premium commitment', 'Premium period', 'Compounding period after premium', 'Withdrawal strategy', 'Projected value']}
-          rows={policies.map((policy) => {
-            const structure = getPolicyStructure(policy, asNumber(profile.retirementAge));
-            const projectedValue = projectPolicyAccumulatedAtAge(policy, asNumber(profile.currentAge), structure.withdrawalStartAge, scenarioRate);
-            return [
-              policy.name || 'Policy',
-              policy.policyStructure || 'Custom',
-              policy.continuePremiumsAfterCommitment
-                ? `${formatCurrency(policy.premiumAmount)}/${policy.premiumFrequency || 'month'} until age ${structure.premiumEndAge}`
-                : `${formatCurrency(policy.premiumAmount)}/${policy.premiumFrequency || 'month'} for ${structure.premiumCommitmentTerm} years`,
-              `Age ${structure.startAge}-${structure.premiumEndAge}`,
-              structure.withdrawalStartAge > structure.premiumEndAge ? `Age ${structure.premiumEndAge}-${structure.withdrawalStartAge}` : '0 years',
-              buildPolicyWithdrawalLabel(structure),
-              formatCurrency(projectedValue),
-            ];
-          })}
-        />
-      </section>
+      {policies.length > 0 && (
+        <section className="export-section avoid-break">
+          <h2>Policy Maturity / Withdrawal Milestones</h2>
+          <SimpleTable
+            headers={['Policy', 'Structure', 'Premium commitment', 'Premium period', 'Compounding period after premium', 'Withdrawal strategy', 'Projected value']}
+            rows={policies.map((policy) => {
+              const structure = getPolicyStructure(policy, asNumber(profile.retirementAge));
+              const projectedValue = projectPolicyAccumulatedAtAge(policy, asNumber(profile.currentAge), structure.withdrawalStartAge, scenarioRate);
+              return [
+                policy.name || 'Policy',
+                policy.policyStructure || 'Custom',
+                policy.continuePremiumsAfterCommitment
+                  ? `${formatCurrency(policy.premiumAmount)}/${policy.premiumFrequency || 'month'} until age ${structure.premiumEndAge}`
+                  : `${formatCurrency(policy.premiumAmount)}/${policy.premiumFrequency || 'month'} for ${structure.premiumCommitmentTerm} years`,
+                `Age ${structure.startAge}-${structure.premiumEndAge}`,
+                structure.withdrawalStartAge > structure.premiumEndAge ? `Age ${structure.premiumEndAge}-${structure.withdrawalStartAge}` : '0 years',
+                buildPolicyWithdrawalLabel(structure),
+                formatCurrency(projectedValue),
+              ];
+            })}
+          />
+        </section>
+      )}
 
       <section className="export-section avoid-break">
         <h2>Personal Investment Summary</h2>
@@ -392,7 +394,7 @@ function calculateCurrentAssets({ cpf, srs, policies, investments, cash, policyC
   if (policies.length > 0) rows.push(['Total current policy value', formatCurrency(totalPolicyValue), 'Policy values entered']);
 
   if (policyCashValueAssets.length > 0) {
-    rows.push(['Policy Cash Values Included', 'Selected policy cash values', 'Only policies marked as included are counted']);
+    rows.push(['Policy Cash Values Included', 'Selected policy cash values', 'Only selected policy cash values are included in this retirement projection.']);
     policyCashValueAssets.forEach((asset) => {
       const isSgd = String(asset.currency || 'SGD').toUpperCase() === 'SGD';
       rows.push([

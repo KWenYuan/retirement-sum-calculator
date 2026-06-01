@@ -5,10 +5,12 @@ import {
   formatPolicyCurrencyWithLabel,
   formatPolicyTimelinePremium,
   getBenefitAmountDisplay,
-  getBenefitCoverageDifferences,
+  getBenefitColor,
+  getBenefitCoverageDetails,
+  getBenefitTint,
   getPolicyTablePremiumValues,
-  getCoveragePeriod,
   getPremiumPeriod,
+  premiumTimelineColor,
 } from '../utils/policySummary.js';
 
 const disclaimer = 'This policy summary is prepared based on information provided and is for discussion purposes only. Please refer to the official policy contracts, benefit illustrations and insurer documents for exact benefits, exclusions, values, terms and conditions.';
@@ -23,16 +25,16 @@ const exportPolicyRows = [
   { label: 'Monthly Premium', totalKey: 'monthlyPremium', get: (policy) => getPolicyTablePremiumValues(policy).monthlyDisplay },
   { label: 'Annual Premium', totalKey: 'annualPremium', get: (policy) => getPolicyTablePremiumValues(policy).annualDisplay },
   { label: 'Premium Payable Period', get: (policy) => getPremiumPeriod(policy).label },
-  { label: 'Death', totalKey: 'death', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'death') },
-  { label: 'TPD', totalKey: 'tpd', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpd') },
-  { label: 'ECI', totalKey: 'eci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'eci') },
-  { label: 'CI', totalKey: 'ci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'ci') },
-  { label: 'Hospitalisation', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalisation') },
-  { label: 'Disability Income', totalKey: 'disabilityIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'disabilityIncome') },
-  { label: 'Death (Accident)', totalKey: 'deathAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'deathAccident') },
-  { label: 'TPD (Accident)', totalKey: 'tpdAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpdAccident') },
-  { label: 'Medical Reimbursement (Accident)', totalKey: 'medicalReimbursementAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'medicalReimbursementAccident') },
-  { label: 'Hospital Income', totalKey: 'hospitalIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalIncome') },
+  { label: 'Death', totalKey: 'death', benefitKey: 'death', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'death') },
+  { label: 'TPD', totalKey: 'tpd', benefitKey: 'tpd', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpd') },
+  { label: 'ECI', totalKey: 'eci', benefitKey: 'eci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'eci') },
+  { label: 'CI', totalKey: 'ci', benefitKey: 'ci', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'ci') },
+  { label: 'Hospitalisation', benefitKey: 'hospitalisation', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalisation') },
+  { label: 'Disability Income', totalKey: 'disabilityIncome', benefitKey: 'disabilityIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'disabilityIncome') },
+  { label: 'Death (Accident)', totalKey: 'deathAccident', benefitKey: 'deathAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'deathAccident') },
+  { label: 'TPD (Accident)', totalKey: 'tpdAccident', benefitKey: 'tpdAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpdAccident') },
+  { label: 'Medical Reimbursement (Accident)', totalKey: 'medicalReimbursementAccident', benefitKey: 'medicalReimbursementAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'medicalReimbursementAccident') },
+  { label: 'Hospital Income', totalKey: 'hospitalIncome', benefitKey: 'hospitalIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalIncome') },
   { label: 'Notes', get: (policy) => textValue(policy.notes) },
 ];
 
@@ -200,17 +202,16 @@ function PolicyTimelinePdf({ policies }) {
   const rows = policies.map((policy) => ({
     policy,
     premium: getPremiumPeriod(policy),
-    coverage: getCoveragePeriod(policy),
-    benefitDifferences: getBenefitCoverageDifferences(policy),
+    benefits: getBenefitCoverageDetails(policy).filter((period) => period.hasBar),
     status: getTimelineStatus(policy),
   }));
-  const benefitDifferenceRows = rows.flatMap((row) => row.benefitDifferences.map((period) => ({
+  const benefitDifferenceRows = rows.flatMap((row) => row.benefits.map((period) => ({
     policyName: row.policy.planName || 'Policy',
     benefit: period.label,
     amount: period.amountDisplay,
     period: period.periodLabel,
   })));
-  const barPeriods = rows.flatMap((row) => [row.premium, row.coverage, ...row.benefitDifferences]).filter((period) => period.hasBar && isValidAge(period.startAge) && isValidAge(period.endAge));
+  const barPeriods = rows.flatMap((row) => [row.premium, ...row.benefits]).filter((period) => period.hasBar && isValidAge(period.startAge) && isValidAge(period.endAge));
   const minAge = barPeriods.length > 0
     ? Math.max(0, Math.floor(Math.min(...barPeriods.map((period) => period.startAge)) / 5) * 5)
     : 25;
@@ -224,9 +225,8 @@ function PolicyTimelinePdf({ policies }) {
   const chartX = leftWidth;
   const chartWidth = width - leftWidth - statusWidth - 12;
   const topPad = 34;
-  const hasBenefitBars = rows.some((row) => row.benefitDifferences.length > 0);
-  const rowHeight = hasBenefitBars ? 42 : rows.length > 12 ? 31 : 32;
-  const height = topPad + (Math.max(rows.length, 1) * rowHeight) + 24;
+  const rowHeights = rows.map((row) => Math.max(32, 22 + (row.benefits.length * 7)));
+  const height = topPad + rowHeights.reduce((sum, rowHeight) => sum + rowHeight, 0) + 24;
   const range = Math.max(1, maxAge - minAge);
   const xForAge = (age) => chartX + (((age - minAge) / range) * chartWidth);
   const bar = (period, y, color, label) => {
@@ -256,8 +256,7 @@ function PolicyTimelinePdf({ policies }) {
         <h2>Policy Timeline</h2>
         <div>
           <span><i className="premium" /> Premium payable</span>
-          <span><i className="coverage" /> Coverage period</span>
-          <span><i className="benefit" /> Benefit-specific</span>
+          <span><i className="benefit" /> Benefit coverage</span>
         </div>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Policy timeline visual">
@@ -272,7 +271,8 @@ function PolicyTimelinePdf({ policies }) {
           );
         })}
         {rows.map((row, index) => {
-          const rowY = topPad + (index * rowHeight);
+          const rowY = topPad + rowHeights.slice(0, index).reduce((sum, rowHeight) => sum + rowHeight, 0);
+          const rowHeight = rowHeights[index];
           const premiumDisplay = formatPolicyTimelinePremium(row.policy);
           return (
             <g key={`timeline-pdf-${row.policy.id}`}>
@@ -281,17 +281,15 @@ function PolicyTimelinePdf({ policies }) {
               <text x="0" y={rowY + 15} className="policy-timeline-pdf-company">{truncateText(`${row.policy.company || '-'} | ${row.status || '-'}`, 42)}</text>
               <text x="0" y={rowY + 23} className="policy-timeline-pdf-company">{truncateText(premiumDisplay, 44)}</text>
               <text x="145" y={rowY + 23} className="policy-timeline-pdf-company">{truncateText(`Premium: ${row.premium.label}`, 30)}</text>
-              <text x="145" y={rowY + 30} className="policy-timeline-pdf-company">{truncateText(`Coverage: ${row.coverage.label}`, 30)}</text>
-              {bar(row.premium, rowY + 3, '#c49a43', 'premium unknown')}
-              {bar(row.coverage, rowY + 13, '#102a4c', 'coverage unknown')}
-              {row.benefitDifferences.slice(0, 2).map((period, benefitIndex) => {
+              {bar(row.premium, rowY + 3, premiumTimelineColor, 'premium unknown')}
+              {row.benefits.map((period, benefitIndex) => {
                 const x = xForAge(period.startAge);
                 const endX = xForAge(period.endAge);
                 const barWidth = Math.max(7, endX - x);
-                const benefitY = rowY + 24 + (benefitIndex * 7);
+                const benefitY = rowY + 14 + (benefitIndex * 7);
                 return (
                   <g key={`timeline-pdf-${row.policy.id}-${period.key}`}>
-                    <rect x={x} y={benefitY} width={barWidth} height="4" rx="2" fill={benefitIndex === 0 ? '#6f56d9' : '#4f86c6'} />
+                    <rect x={x} y={benefitY} width={barWidth} height="4" rx="2" fill={getBenefitColor(period.key)} />
                     <text x={Math.min(x + barWidth + 4, chartX + chartWidth - 54)} y={benefitY + 4} className="policy-timeline-pdf-bar-label">
                       {truncateText(`${period.label}: ${period.periodLabel}`, 26)}
                     </text>
@@ -307,7 +305,7 @@ function PolicyTimelinePdf({ policies }) {
       </svg>
       {benefitDifferenceRows.length > 0 && (
         <div className="policy-benefit-differences-pdf">
-          <h3>Benefit Coverage Differences</h3>
+          <h3>Benefit Coverage Periods</h3>
           <table>
             <thead>
               <tr>
@@ -355,7 +353,14 @@ function PolicySummaryChunkTable({
       </thead>
       <tbody>
         {exportPolicyRows.map((row) => (
-          <tr key={row.label} className={row.highlight ? 'coverage-row' : ''}>
+          <tr
+            key={row.label}
+            className={row.highlight ? 'coverage-row' : ''}
+            style={row.benefitKey ? {
+              '--benefit-color': getBenefitColor(row.benefitKey),
+              '--benefit-tint': getBenefitTint(row.benefitKey),
+            } : undefined}
+          >
             <th>{row.label}</th>
             {policies.map((policy) => <td key={`${policy.id}-${row.label}`}>{row.get(policy)}</td>)}
             <td className="policy-export-total-column">

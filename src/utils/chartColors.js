@@ -17,6 +17,7 @@ export const BREAKDOWN_COLORS = {
   CPF: ASSET_COLORS.cpf,
   SRS: ASSET_COLORS.srs,
   Policies: ASSET_COLORS.policy,
+  'Policy cash values': ASSET_COLORS.policy,
   Investments: ASSET_COLORS.investment,
   Cash: ASSET_COLORS.cash,
 };

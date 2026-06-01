@@ -12,7 +12,6 @@ import {
   CashSection,
   CpfSection,
   InvestmentsSection,
-  PoliciesSection,
   PolicyCashValueReview,
   ProfileSection,
   RetirementGoalSection,
@@ -102,20 +101,20 @@ export default function App() {
     [policySummaryData],
   );
   const retirementTimelineEndAge = getRetirementTimelineEndAge(profile);
-  const projectionState = { profile, cpf, srs, policies, investments, cash, scenarioRate, timelineEndAge: retirementTimelineEndAge };
-  const timeline = useMemo(() => buildTimeline(projectionState), [profile, cpf, srs, policies, investments, cash, scenarioRate]);
-  const retirementTimeline = useMemo(() => buildRetirementTimeline(projectionState), [profile, cpf, srs, policies, investments, cash, scenarioRate]);
+  const projectionState = { profile, cpf, srs, policies: [], policyCashValueAssets, investments, cash, scenarioRate, timelineEndAge: retirementTimelineEndAge };
+  const timeline = useMemo(() => buildTimeline(projectionState), [profile, cpf, srs, policyCashValueAssets, investments, cash, scenarioRate]);
+  const retirementTimeline = useMemo(() => buildRetirementTimeline(projectionState), [profile, cpf, srs, policyCashValueAssets, investments, cash, scenarioRate]);
   const clampedSelectedAge = Math.min(Math.max(selectedAge, profile.currentAge), retirementTimelineEndAge);
   const selectedBreakdown = useMemo(
     () => calculateAtAge({ ...projectionState, age: clampedSelectedAge }),
-    [profile, cpf, srs, policies, investments, cash, scenarioRate, clampedSelectedAge],
+    [profile, cpf, srs, policyCashValueAssets, investments, cash, scenarioRate, clampedSelectedAge],
   );
   const retirementPoint = useMemo(
     () => calculateAtAge({ ...projectionState, age: profile.retirementAge }),
-    [profile, cpf, srs, policies, investments, cash, scenarioRate],
+    [profile, cpf, srs, policyCashValueAssets, investments, cash, scenarioRate],
   );
   const needs = useMemo(() => calculateNeeds(profile, retirementPoint.total), [profile, retirementPoint.total]);
-  const startLater = useMemo(() => startLaterComparison(projectionState), [profile, cpf, srs, policies, investments, cash, scenarioRate]);
+  const startLater = useMemo(() => startLaterComparison(projectionState), [profile, cpf, srs, policyCashValueAssets, investments, cash, scenarioRate]);
   const ageDetails = useMemo(
     () => getAgeTimelineDetails(retirementTimeline, clampedSelectedAge),
     [retirementTimeline, clampedSelectedAge],
@@ -126,16 +125,16 @@ export default function App() {
     [profile, clampedSelectedAge, ageDetails],
   );
   const currentReviewSnapshot = useMemo(
-    () => buildReviewSnapshot({ profile, cpf, srs, policies, investments, cash, scenario }),
-    [profile, cpf, srs, policies, investments, cash, scenario],
+    () => buildReviewSnapshot({ profile, cpf, srs, policies: [], policyCashValueAssets, investments, cash, scenario }),
+    [profile, cpf, srs, policyCashValueAssets, investments, cash, scenario],
   );
   const annualReviewComparison = useMemo(
-    () => buildAnnualReviewComparison(previousReviewData, { profile, cpf, srs, policies, investments, cash, scenario }, currentReviewSnapshot),
-    [previousReviewData, profile, cpf, srs, policies, investments, cash, scenario, currentReviewSnapshot],
+    () => buildAnnualReviewComparison(previousReviewData, { profile, cpf, srs, policies: [], policyCashValueAssets, investments, cash, scenario }, currentReviewSnapshot),
+    [previousReviewData, profile, cpf, srs, policyCashValueAssets, investments, cash, scenario, currentReviewSnapshot],
   );
   const reviewChanges = useMemo(
-    () => buildChangedSinceLastReview(previousReviewData, { profile, cpf, srs, policies, investments, cash, scenario }, annualReviewComparison),
-    [previousReviewData, profile, cpf, srs, policies, investments, cash, scenario, annualReviewComparison],
+    () => buildChangedSinceLastReview(previousReviewData, { profile, cpf, srs, policies: [], policyCashValueAssets, investments, cash, scenario }, annualReviewComparison),
+    [previousReviewData, profile, cpf, srs, policyCashValueAssets, investments, cash, scenario, annualReviewComparison],
   );
 
   const exportDate = new Date().toLocaleDateString('en-CA');
@@ -143,7 +142,8 @@ export default function App() {
     profile,
     cpf,
     srs,
-    policies,
+    policies: [],
+    policyCashValueAssets,
     investments,
     cash,
     scenario,
@@ -152,7 +152,7 @@ export default function App() {
     followUpTasks,
     previousReviewData,
     includeFollowUpTasksInPdf,
-  }), [profile, cpf, srs, policies, investments, cash, scenario, clampedSelectedAge, advisorInsight, followUpTasks, previousReviewData, includeFollowUpTasksInPdf]);
+  }), [profile, cpf, srs, policyCashValueAssets, investments, cash, scenario, clampedSelectedAge, advisorInsight, followUpTasks, previousReviewData, includeFollowUpTasksInPdf]);
 
   const handlePolicySummaryDataChange = useCallback((nextData) => {
     setPolicySummaryData(nextData);
@@ -332,20 +332,20 @@ export default function App() {
               onDataChange={handlePolicySummaryDataChange}
             />
 
+            <PolicyCashValueReview
+              policySummaryPolicies={policySummaryData?.policies || []}
+              retirementPolicies={[]}
+              onToggle={updatePolicyCashValueInclusion}
+            />
+
             <section className="client-input-group">
               <div className="client-input-group-heading">
-                <h2>Retirement Inputs</h2>
-                <p>Projection assumptions and assets used by the Retirement Projection page.</p>
+                <h2>Retirement Assets & Assumptions</h2>
+                <p>Enter non-policy retirement assets and assumptions such as CPF, SRS, investments, cash, and retirement goals.</p>
               </div>
               <RetirementGoalSection profile={profile} setProfile={setProfile} />
-              <PolicyCashValueReview
-                policySummaryPolicies={policySummaryData?.policies || []}
-                retirementPolicies={policies}
-                onToggle={updatePolicyCashValueInclusion}
-              />
               <CpfSection cpf={cpf} setCpf={setCpf} profile={profile} />
               <SrsSection srs={srs} setSrs={setSrs} />
-              <PoliciesSection policies={policies} setPolicies={setPolicies} profile={profile} scenarioRate={scenarioRate} />
               <InvestmentsSection investments={investments} setInvestments={setInvestments} profile={profile} scenarioRate={scenarioRate} />
               <CashSection cash={cash} setCash={setCash} />
             </section>
@@ -357,6 +357,24 @@ export default function App() {
               importPreviousReviewData={requestImportPreviousReviewData}
               clearPreviousReviewData={clearPreviousReviewData}
             />
+
+            <section className="panel data-export-panel">
+              <div>
+                <h2>Data Import / Export</h2>
+                <p>Retirement JSON controls are here. Policy Summary JSON controls are in the Policy Summary Inputs card above.</p>
+              </div>
+              <div className="data-export-actions">
+                <button className="ghost-button data-action-button" type="button" onClick={exportClientData}>
+                  Export Retirement Client Data
+                </button>
+                <button className="ghost-button data-action-button" type="button" onClick={requestImportClientData}>
+                  Import Retirement Client Data
+                </button>
+                <button className="ghost-button data-action-button subtle" type="button" onClick={clearBrowserSavedData}>
+                  Clear Saved Data
+                </button>
+              </div>
+            </section>
 
             <FollowUpTasks
               tasks={followUpTasks}
@@ -377,24 +395,6 @@ export default function App() {
                 onChange={(event) => setAdvisorInsight(event.target.value)}
                 placeholder="Client has strong income but most wealth is held in cash..."
               />
-            </section>
-
-            <section className="panel data-export-panel">
-              <div>
-                <h2>Data Import / Export</h2>
-                <p>Retirement JSON controls are here. Policy Summary JSON controls are in the Policy Summary Inputs card above.</p>
-              </div>
-              <div className="data-export-actions">
-                <button className="ghost-button data-action-button" type="button" onClick={exportClientData}>
-                  Export Retirement Client Data
-                </button>
-                <button className="ghost-button data-action-button" type="button" onClick={requestImportClientData}>
-                  Import Retirement Client Data
-                </button>
-                <button className="ghost-button data-action-button subtle" type="button" onClick={clearBrowserSavedData}>
-                  Clear Saved Data
-                </button>
-              </div>
             </section>
           </section>
         </main>
@@ -419,7 +419,8 @@ export default function App() {
               profile={profile}
               cpf={cpf}
               srs={srs}
-              policies={policies}
+              policies={[]}
+              policyCashValueAssets={policyCashValueAssets}
               investments={investments}
               cash={cash}
               scenarioRate={scenarioRate}
@@ -488,7 +489,7 @@ export default function App() {
             profile={profile}
             cpf={cpf}
             srs={srs}
-            policies={policies}
+            policies={[]}
             investments={investments}
             cash={cash}
             scenarioRate={scenarioRate}

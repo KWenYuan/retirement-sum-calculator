@@ -32,6 +32,7 @@ export function buildClientDataState({
   cpf,
   srs,
   policies,
+  policyCashValueAssets = [],
   investments,
   cash,
   scenario,
@@ -46,6 +47,7 @@ export function buildClientDataState({
     cpf,
     srs,
     policies: sanitizePolicies(policies),
+    policyCashValueAssets: sanitizePolicyCashValueAssets(policyCashValueAssets),
     investments: sanitizeInvestments(
       investments,
       profile,
@@ -83,6 +85,7 @@ export function restoreCalculatorState(data = {}) {
     cpf: normalizeCpfFields(data.cpf, data.cpfEnabled),
     srs: { ...defaultSrs, ...(data.srs || {}) },
     policies: normalizeList(data.policies, starterPolicies),
+    policyCashValueAssets: Array.isArray(data.policyCashValueAssets) ? data.policyCashValueAssets : [],
     investments: normalizeList(data.investments, starterInvestments),
     cash: sanitizeCash({ ...defaultCash, ...(data.cash || {}) }),
     scenario: data.scenario || 'balanced',
@@ -271,6 +274,17 @@ function sanitizePolicies(policies = []) {
       withdrawalAge: policy.withdrawalStartAge ?? policy.withdrawalAge,
     };
   });
+}
+
+function sanitizePolicyCashValueAssets(policyCashValueAssets = []) {
+  return policyCashValueAssets.map((asset) => ({
+    id: asset.id,
+    planName: asset.planName || 'Policy',
+    company: asset.company || '',
+    cashValue: asset.cashValue,
+    currency: asset.currency || 'SGD',
+    label: asset.label || `Policy Cash Value - ${asset.planName || 'Policy'}`,
+  }));
 }
 
 function inferPolicyStructure(item = {}, fallback = {}) {

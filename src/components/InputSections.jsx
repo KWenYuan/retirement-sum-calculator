@@ -142,35 +142,38 @@ export function CashSection({ cash, setCash }) {
 
 export function PolicyCashValueReview({ policySummaryPolicies = [], retirementPolicies = [], onToggle }) {
   const policiesWithCashValue = policySummaryPolicies.filter((policy) => Number(policy.cashValue) > 0);
-  if (policiesWithCashValue.length === 0) return null;
 
   return (
-    <AccordionSection title="Policy Cash Values">
+    <AccordionSection title="Policy Cash Values for Retirement Projection">
       <div className="policy-cash-review">
-        <p className="field-helper">Only policy cash values marked as included are counted in the retirement projection. Check manually to avoid double counting.</p>
-        <div className="policy-cash-review-table">
-          <span>Policy</span>
-          <span>Cash Value</span>
-          <span>Include</span>
-          {policiesWithCashValue.map((policy) => {
-            const mayDuplicate = hasPossibleRetirementPolicyMatch(policy, retirementPolicies);
-            return (
-              <div className="policy-cash-review-row" key={policy.id}>
-                <strong>
-                  {policy.planName || 'Policy'}
-                  {policy.company && <small>{policy.company}</small>}
-                  {mayDuplicate && <em>This policy may already exist in Retirement Projection. Check to avoid double counting.</em>}
-                </strong>
-                <b>{formatPolicyCurrencyWithLabel(policy.cashValue, policy.currency)}</b>
-                <Toggle
-                  label="Include"
-                  checked={Boolean(policy.includeCashValueInRetirement)}
-                  onChange={(value) => onToggle(policy.id, value)}
-                />
-              </div>
-            );
-          })}
-        </div>
+        <p className="field-helper">Only selected policy cash values are counted in the retirement projection. Policy details remain managed in the Policy Summary section above.</p>
+        {policiesWithCashValue.length === 0 ? (
+          <p className="field-helper">No policy cash values have been entered yet.</p>
+        ) : (
+          <div className="policy-cash-review-table">
+            <span>Policy</span>
+            <span>Cash Value</span>
+            <span>Include</span>
+            {policiesWithCashValue.map((policy) => {
+              const mayDuplicate = hasPossibleRetirementPolicyMatch(policy, retirementPolicies);
+              return (
+                <div className="policy-cash-review-row" key={policy.id}>
+                  <strong>
+                    {policy.planName || 'Policy'}
+                    {policy.company && <small>{policy.company}</small>}
+                    {mayDuplicate && <em>This policy may already exist in Retirement Projection. Check to avoid double counting.</em>}
+                  </strong>
+                  <b>{formatPolicyCurrencyWithLabel(policy.cashValue, policy.currency)}</b>
+                  <Toggle
+                    label="Include"
+                    checked={Boolean(policy.includeCashValueInRetirement)}
+                    onChange={(value) => onToggle(policy.id, value)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </AccordionSection>
   );
