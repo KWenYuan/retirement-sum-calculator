@@ -209,7 +209,16 @@ export const projectCpfAtAge = (cpf, currentAge, targetAge) => {
   const transfer = calculateCpfAge55Transfer(cpf, { currentAge: startAge });
   if (!transfer) return 0;
   const yearsAfter55 = Math.max(0, endAge - 55);
-  return compoundAnnual(transfer.raSetAside, cpfRules.cpfRaInterestRate * 100, yearsAfter55);
+  const projectedMaAt55 = projectCpfAccount(
+    cpf.maBalance,
+    cpf.monthlyContribution,
+    cpfRules.monthlyContributionAllocation.ma,
+    cpfRules.cpfMaInterestRate,
+    startAge,
+    55,
+  );
+  return compoundAnnual(transfer.raSetAside, cpfRules.cpfRaInterestRate * 100, yearsAfter55) +
+    compoundAnnual(projectedMaAt55, cpfRules.cpfMaInterestRate * 100, yearsAfter55);
 };
 
 export const projectCpfOaSa = (cpf, currentAge, targetAge) => {
@@ -440,7 +449,7 @@ export const projectCash = (cash, years) => {
 
 export const isCashIncludedInProjection = (cash = {}) => cash.includeCashInProjection !== false;
 
-export const calculateTransferredLumpSumsAtAge = ({ profile, policies = [], investments = [], cash = {}, scenarioRate, age }) => {
+export const calculateTransferredLumpSumsAtAge = ({ profile, cpf = {}, policies = [], investments = [], cash = {}, scenarioRate, age }) => {
   const selectedAge = asNumber(age);
   const currentAge = asNumber(profile.currentAge);
   const growTransferredCash = (value, withdrawalAge) => compoundAnnual(
@@ -464,7 +473,11 @@ export const calculateTransferredLumpSumsAtAge = ({ profile, policies = [], inve
     return total + growTransferredCash(lumpSumValue, structure.withdrawalStartAge);
   }, 0);
 
-  return policyTransfers + investmentTransfers;
+  const cpfTransfer = selectedAge >= 55 && currentAge <= 55 && hasCpfFrsMilestoneData(cpf)
+    ? growTransferredCash(calculateCpfAge55Transfer(cpf, profile)?.withdrawableAmount || 0, 55)
+    : 0;
+
+  return cpfTransfer + policyTransfers + investmentTransfers;
 };
 
 export const calculateAtAge = ({ profile, cpf, srs, policies = [], policyCashValueAssets = [], investments, cash, scenarioRate, age }) => {
@@ -484,7 +497,7 @@ export const calculateAtAge = ({ profile, cpf, srs, policies = [], policyCashVal
     (total, investment) => total + projectInvestmentAtAge(investment, profile.currentAge, age, scenarioRate, profile.retirementDuration),
     0,
   );
-  const transferredLumpSums = calculateTransferredLumpSumsAtAge({ profile, policies, investments, cash, scenarioRate, age });
+  const transferredLumpSums = calculateTransferredLumpSumsAtAge({ profile, cpf, policies, investments, cash, scenarioRate, age });
   const cashValue = (isCashIncludedInProjection(cash) ? projectCash(cash, years) : 0) + transferredLumpSums;
   const total = cpfValue + srsValue + policyValue + investmentValue + cashValue;
 

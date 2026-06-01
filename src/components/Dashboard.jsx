@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -58,6 +58,7 @@ export function Dashboard({
   const isClientFacing = clientFacing;
   const [chartView, setChartView] = useState('total-components');
   const [highlightedSeries, setHighlightedSeries] = useState(null);
+  const lastTouchLegendKeyRef = useRef(null);
   const { chartData, series } = useMemo(
     () => buildProjectionSeries({ profile, cpf, srs, policies, policyCashValueAssets, investments, cash, scenarioRate, timeline }),
     [profile, cpf, srs, policies, policyCashValueAssets, investments, cash, scenarioRate, timeline],
@@ -208,12 +209,28 @@ export function Dashboard({
             {series.map((item) => {
               const isVisible = visibleSeries.some((visible) => visible.key === item.key);
               const isHighlighted = highlightedSeries === item.key;
+              const toggleLegendItem = () => setHighlightedSeries((current) => (current === item.key ? null : item.key));
               return (
                 <button
                   type="button"
                   key={item.key}
                   className={`${isHighlighted ? 'active' : ''} ${!isVisible ? 'muted' : ''}`}
-                  onClick={() => setHighlightedSeries(isHighlighted ? null : item.key)}
+                  onClick={() => {
+                    if (lastTouchLegendKeyRef.current === item.key) {
+                      lastTouchLegendKeyRef.current = null;
+                      return;
+                    }
+                    toggleLegendItem();
+                  }}
+                  onPointerUp={(event) => {
+                    if (event.pointerType === 'touch') {
+                      lastTouchLegendKeyRef.current = item.key;
+                      toggleLegendItem();
+                      window.setTimeout(() => {
+                        if (lastTouchLegendKeyRef.current === item.key) lastTouchLegendKeyRef.current = null;
+                      }, 350);
+                    }
+                  }}
                 >
                   <span style={{ background: item.color }} />
                   {item.name}

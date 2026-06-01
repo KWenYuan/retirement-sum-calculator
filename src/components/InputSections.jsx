@@ -120,10 +120,14 @@ export function CashSection({ cash, setCash }) {
   return (
     <AccordionSection
       title="Cash / Savings"
-      action={!isIncluded && <span className="excluded-badge">Excluded</span>}
+      action={(
+        <div className="section-toggle-action">
+          <Toggle label="Include in projection" checked={isIncluded} onChange={(value) => update('includeCashInProjection', value)} />
+          {!isIncluded && <span className="excluded-badge">Excluded</span>}
+        </div>
+      )}
     >
       <div className="form-grid compact input-compact-grid">
-        <Toggle label="Include in projection" checked={isIncluded} onChange={(value) => update('includeCashInProjection', value)} />
         <NumberField label="Current cash savings" prefix="$" value={cash.currentSavings} onChange={(value) => update('currentSavings', value)} />
         <NumberField label="Monthly cash savings" prefix="$" value={cash.monthlySavings} onChange={(value) => update('monthlySavings', value)} />
         <NumberField label="Emergency fund" prefix="$" value={cash.emergencyFund} onChange={(value) => update('emergencyFund', value)} />
