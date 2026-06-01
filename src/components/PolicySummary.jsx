@@ -58,6 +58,7 @@ const policyRows = [
   { label: 'TPD (Accident)', totalKey: 'tpdAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'tpdAccident') },
   { label: 'Medical Reimbursement (Accident)', totalKey: 'medicalReimbursementAccident', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'medicalReimbursementAccident') },
   { label: 'Hospital Income', totalKey: 'hospitalIncome', highlight: true, get: (policy) => getBenefitAmountDisplay(policy, 'hospitalIncome') },
+  { label: 'Notes', get: (policy) => textValue(policy.notes) },
 ];
 
 export function PolicySummary({ viewMode = 'advisor' }) {
@@ -399,6 +400,12 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
               <NumberField label="Cash value" prefix="$" value={policy.cashValue} onChange={(value) => updatePolicy(policy.id, 'cashValue', value)} />
             </div>
           </details>
+          <details className="advanced-block">
+            <summary>Notes</summary>
+            <div className="form-grid compact input-compact-grid">
+              <TextField label="Notes" value={policy.notes} onChange={(value) => updatePolicy(policy.id, 'notes', value)} />
+            </div>
+          </details>
         </div>
       )}
     </div>
@@ -629,6 +636,7 @@ function PolicyTimeline({ policies, selectedPolicy, setSelectedPolicyId }) {
               />
             ))}
             <SummaryLine label="Premium" value={formatPolicyTimelinePremium(selectedPolicy)} />
+            <SummaryLine label="Notes" value={selectedPolicy.notes || '-'} />
           </div>
         </div>
       )}
