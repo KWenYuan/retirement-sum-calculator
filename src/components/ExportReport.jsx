@@ -3,6 +3,7 @@ import {
   formatCurrency,
   getInvestmentStructure,
   getPolicyStructure,
+  getCpfAge55ExcessTreatment,
   hasCpfFrsMilestoneData,
   hasCpfProjectionData,
   projectCash,
@@ -56,6 +57,7 @@ export function ExportReport({
   });
   const timelineVisualRows = timelineRows.slice(0, 8);
   const cpf55 = includeCpf55 ? calculateCpfAge55Transfer(cpf, profile) : null;
+  const cpfAge55Treatment = getCpfAge55ExcessTreatment(cpf);
   const srsSummary = buildSrsSummary(profile, srs);
   const personalInvestmentRows = investments.map((investment) => {
     const structure = getInvestmentStructure(investment, asNumber(profile.retirementAge), asNumber(profile.retirementDuration));
@@ -168,6 +170,7 @@ export function ExportReport({
               ['Projected OA + SA at age 55', formatCurrency(cpf55.projectedOaSa)],
               ['Estimated RA set aside', formatCurrency(cpf55.raSetAside)],
               ['Estimated withdrawable amount', formatCurrency(cpf55.withdrawableAmount)],
+              ['CPF age 55 excess assumption', cpfAge55Treatment === 'withdrawToCash' ? 'Withdraw to Cash / Savings' : 'Keep in CPF OA'],
               [cpf55.shortfall > 0 ? 'Estimated shortfall' : 'Estimated excess', formatCurrency(cpf55.shortfall || cpf55.excess)],
             ]}
           />

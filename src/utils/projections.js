@@ -87,6 +87,12 @@ export const hasCpfFrsMilestoneData = (cpf = {}) => (
   )
 );
 
+export const getCpfAge55ExcessTreatment = (cpf = {}) => (
+  cpf.age55ExcessTreatment === 'withdrawToCash' ? 'withdrawToCash' : 'keepInOA'
+);
+
+export const shouldWithdrawCpfExcessAt55 = (cpf = {}) => getCpfAge55ExcessTreatment(cpf) === 'withdrawToCash';
+
 export const getCpfYearTurning55 = (profile = {}, currentYear = new Date().getFullYear()) => (
   asNumber(currentYear) + Math.max(0, 55 - asNumber(profile.currentAge))
 );
@@ -200,6 +206,11 @@ export const projectCpfAtAge = (cpf, currentAge, targetAge) => {
   if (!hasCpfProjectionData(cpf)) return 0;
   const startAge = asNumber(currentAge);
   const endAge = asNumber(targetAge);
+  if (startAge > 55) {
+    return projectCpfAccount(cpf.oaBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.oa, cpfRules.cpfOaInterestRate, startAge, endAge) +
+      projectCpfAccount(cpf.saBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.sa, cpfRules.cpfSaInterestRate, startAge, endAge) +
+      projectCpfAccount(cpf.maBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.ma, cpfRules.cpfMaInterestRate, startAge, endAge);
+  }
   if (endAge < 55) {
     return projectCpfAccount(cpf.oaBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.oa, cpfRules.cpfOaInterestRate, startAge, endAge) +
       projectCpfAccount(cpf.saBalance, cpf.monthlyContribution, cpfRules.monthlyContributionAllocation.sa, cpfRules.cpfSaInterestRate, startAge, endAge) +
@@ -217,8 +228,12 @@ export const projectCpfAtAge = (cpf, currentAge, targetAge) => {
     startAge,
     55,
   );
+  const keptOaExcess = shouldWithdrawCpfExcessAt55(cpf)
+    ? 0
+    : compoundAnnual(transfer.withdrawableAmount, cpfRules.cpfOaInterestRate * 100, yearsAfter55);
   return compoundAnnual(transfer.raSetAside, cpfRules.cpfRaInterestRate * 100, yearsAfter55) +
-    compoundAnnual(projectedMaAt55, cpfRules.cpfMaInterestRate * 100, yearsAfter55);
+    compoundAnnual(projectedMaAt55, cpfRules.cpfMaInterestRate * 100, yearsAfter55) +
+    keptOaExcess;
 };
 
 export const projectCpfOaSa = (cpf, currentAge, targetAge) => {
@@ -473,7 +488,7 @@ export const calculateTransferredLumpSumsAtAge = ({ profile, cpf = {}, policies 
     return total + growTransferredCash(lumpSumValue, structure.withdrawalStartAge);
   }, 0);
 
-  const cpfTransfer = selectedAge >= 55 && currentAge <= 55 && hasCpfFrsMilestoneData(cpf)
+  const cpfTransfer = selectedAge >= 55 && currentAge <= 55 && hasCpfFrsMilestoneData(cpf) && shouldWithdrawCpfExcessAt55(cpf)
     ? growTransferredCash(calculateCpfAge55Transfer(cpf, profile)?.withdrawableAmount || 0, 55)
     : 0;
 
@@ -533,7 +548,7 @@ export const buildRetirementTimeline = (state) => {
   const toPercent = (age) => `${Math.min(100, Math.max(0, ((asNumber(age) - startAge) / years) * 100))}%`;
   const lumpSums = [];
   const incomeStreams = [];
-  const addLumpSum = ({ age, title, amount, category, description }) => {
+  const addLumpSum = ({ age, title, amount, category, description, exportType = 'Lump Sum', exportAmount, countsAsLumpSum = true }) => {
     const eventAge = asNumber(age);
     if (!eventAge || eventAge < startAge || eventAge > endAge) return;
     lumpSums.push({
@@ -542,11 +557,12 @@ export const buildRetirementTimeline = (state) => {
       title,
       amount,
       category,
+      countsAsLumpSum,
       description: description || `${title}: ${formatCurrency(amount)}`,
       left: toPercent(eventAge),
-      exportType: 'Lump Sum',
-      exportAmount: formatCurrency(amount),
-      exportDuration: 'One-time',
+      exportType,
+      exportAmount: exportAmount || formatCurrency(amount),
+      exportDuration: exportType === 'Milestone' ? 'Assumption' : 'One-time',
     });
   };
   const addIncomeStream = ({ start, end, title, category, amountPerPeriod, frequency, description, durationLabel }) => {
@@ -612,12 +628,16 @@ export const buildRetirementTimeline = (state) => {
       cpf55Age >= startAge &&
       cpf55Age <= endAge
     ) {
+      const withdrawsExcess = shouldWithdrawCpfExcessAt55(state.cpf);
       addLumpSum({
         age: cpf55Age,
-        title: 'CPF Age 55 Transfer',
-        amount: transfer.withdrawableAmount,
+        title: withdrawsExcess ? 'CPF excess withdrawn to Cash / Savings' : 'CPF excess kept in OA',
+        amount: withdrawsExcess ? transfer.withdrawableAmount : 0,
         category: 'CPF',
-        description: `Client turns 55 in ${transfer.yearTurning55}. Retirement sum type: ${transfer.retirementSumType}. Estimated BRS: ${formatCurrency(transfer.brs)}. Estimated FRS: ${formatCurrency(transfer.frs)}. Estimated ERS: ${formatCurrency(transfer.ers)}. Projected OA at 55: ${formatCurrency(transfer.projectedOa)}. Projected SA at 55: ${formatCurrency(transfer.projectedSa)}. Projected OA + SA: ${formatCurrency(transfer.projectedOaSa)}. Estimated RA set aside: ${formatCurrency(transfer.raSetAside)}. Withdrawable: ${formatCurrency(transfer.withdrawableAmount)}. Estimated ${transfer.shortfall > 0 ? 'shortfall' : 'excess'}: ${formatCurrency(transfer.shortfall || transfer.excess)}.`,
+        description: `Client turns 55 in ${transfer.yearTurning55}. Retirement sum type: ${transfer.retirementSumType}. Estimated BRS: ${formatCurrency(transfer.brs)}. Estimated FRS: ${formatCurrency(transfer.frs)}. Estimated ERS: ${formatCurrency(transfer.ers)}. Projected OA at 55: ${formatCurrency(transfer.projectedOa)}. Projected SA at 55: ${formatCurrency(transfer.projectedSa)}. Projected OA + SA: ${formatCurrency(transfer.projectedOaSa)}. Estimated RA set aside: ${formatCurrency(transfer.raSetAside)}. ${withdrawsExcess ? 'Excess withdrawn to Cash / Savings' : 'Excess kept in CPF OA'}: ${formatCurrency(transfer.withdrawableAmount)}. Estimated ${transfer.shortfall > 0 ? 'shortfall' : 'excess'}: ${formatCurrency(transfer.shortfall || transfer.excess)}.`,
+        exportType: withdrawsExcess ? 'Lump Sum' : 'Milestone',
+        exportAmount: withdrawsExcess ? formatCurrency(transfer.withdrawableAmount) : `Kept in CPF OA: ${formatCurrency(transfer.withdrawableAmount)}`,
+        countsAsLumpSum: withdrawsExcess,
       });
     }
   }
@@ -750,7 +770,9 @@ export const calculatePayoutSummary = ({ milestones = [], incomeStreams = [], ag
   const lumpSumEvents = typeof age === 'undefined'
     ? milestones
     : getLumpSumEventsAtAge(milestones, age);
-  const lumpSum = lumpSumEvents.reduce((total, event) => total + asNumber(event.amount), 0);
+  const lumpSum = lumpSumEvents.reduce((total, event) => (
+    event.countsAsLumpSum === false ? total : total + asNumber(event.amount)
+  ), 0);
   const monthlyIncome = activeIncomeStreams
     .filter((stream) => stream.frequency === 'monthly')
     .reduce((total, stream) => total + asNumber(stream.amountPerPeriod), 0);

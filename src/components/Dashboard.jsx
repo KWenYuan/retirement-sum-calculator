@@ -17,6 +17,7 @@ import { Database, Download, FileText, FolderUp, Trash2, TrendingUp } from 'luci
 import { ASSET_COLORS, BREAKDOWN_COLORS, INVESTMENT_COLORS, POLICY_COLORS } from '../utils/chartColors.js';
 import {
   formatCurrency,
+  getCpfAge55ExcessTreatment,
   hasCpfProjectionData,
   isCashIncludedInProjection,
   projectCpfAtAge,
@@ -412,7 +413,13 @@ function buildProjectionSeries({ profile, cpf, srs, policies, policyCashValueAss
     });
   });
   if (isCashIncludedInProjection(cash) || timeline.some((point) => Number(point.cash) > 0)) {
-    series.push({ key: 'cash', name: 'Cash / Savings', color: ASSET_COLORS.cash });
+    series.push({
+      key: 'cash',
+      name: getCpfAge55ExcessTreatment(cpf) === 'withdrawToCash'
+        ? 'Cash / Savings + CPF Withdrawn'
+        : 'Cash / Savings',
+      color: ASSET_COLORS.cash,
+    });
   }
 
   const currentAge = Number(profile.currentAge);

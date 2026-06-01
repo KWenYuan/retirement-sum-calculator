@@ -69,7 +69,8 @@ export function RetirementTimeline({
             const position = ((Number(age) - timeline.startAge) / span) * 100;
             const edgeClass = position < 8 ? 'edge-left' : position > 92 ? 'edge-right' : '';
             const startingStreams = getStartingStreams(timeline.incomeStreams, Number(age));
-            const lumpTotal = events.reduce((total, event) => total + event.amount, 0);
+            const lumpEvents = events.filter((event) => event.countsAsLumpSum !== false);
+            const lumpTotal = lumpEvents.reduce((total, event) => total + event.amount, 0);
             const categoryClass = getCategoryClass(events[0]?.category);
             return (
               <button
@@ -81,7 +82,7 @@ export function RetirementTimeline({
               >
                 <span className="lump-card">
                   <b>Age {age}</b>
-                  <small>{events.length} lump sum {events.length === 1 ? 'event' : 'events'}</small>
+                  <small>{lumpEvents.length > 0 ? `${lumpEvents.length} lump sum ${lumpEvents.length === 1 ? 'event' : 'events'}` : `${events.length} milestone ${events.length === 1 ? 'event' : 'events'}`}</small>
                   {startingStreams.length > 0 && (
                     <small>{startingStreams.length} income {startingStreams.length === 1 ? 'stream' : 'streams'}</small>
                   )}

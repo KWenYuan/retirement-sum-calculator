@@ -298,6 +298,7 @@ function normalizeCpfFields(cpfData, legacyCpfEnabled) {
     manualRetirementSumAmount: cpfData.manualRetirementSumAmount ?? cpfData.frsAmountAt55 ?? defaultCpf.manualRetirementSumAmount,
     minimumWithdrawalIfBelowFRS: cpfData.minimumWithdrawalIfBelowFRS ?? defaultCpf.minimumWithdrawalIfBelowFRS,
     includeCpf55WithdrawableInTimeline: cpfData.includeCpf55WithdrawableInTimeline ?? defaultCpf.includeCpf55WithdrawableInTimeline,
+    age55ExcessTreatment: cpfData.age55ExcessTreatment === 'withdrawToCash' ? 'withdrawToCash' : 'keepInOA',
   };
   if (typeof cpfData.enabled !== 'undefined') return merged;
   if (typeof legacyCpfEnabled !== 'undefined') {

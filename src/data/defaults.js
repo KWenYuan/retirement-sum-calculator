@@ -39,6 +39,7 @@ export const defaultCpf = {
   manualRetirementSumAmount: 230000,
   minimumWithdrawalIfBelowFRS: cpfRules.defaultWithdrawalAt55IfBelowRetirementSum,
   includeCpf55WithdrawableInTimeline: true,
+  age55ExcessTreatment: 'keepInOA',
   cpfLifePayoutStartAge: 65,
   cpfLifeMonthlyPayout: 0,
 };

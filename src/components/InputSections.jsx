@@ -71,6 +71,30 @@ export function CpfSection({ cpf, setCpf, profile }) {
             <NumberField label="CPF MA" prefix="$" value={cpf.maBalance} onChange={(value) => update('maBalance', value)} />
             <NumberField label="Monthly CPF contribution" prefix="$" value={cpf.monthlyContribution} onChange={(value) => update('monthlyContribution', value)} />
           </div>
+          <div className="cpf-treatment-panel">
+            <span>CPF excess at age 55</span>
+            <div className="choice-buttons" role="group" aria-label="CPF excess at age 55 treatment">
+              <button
+                type="button"
+                className={cpf.age55ExcessTreatment === 'withdrawToCash' ? 'active' : ''}
+                onClick={() => update('age55ExcessTreatment', 'withdrawToCash')}
+              >
+                Withdraw excess to Cash / Savings
+              </button>
+              <button
+                type="button"
+                className={cpf.age55ExcessTreatment !== 'withdrawToCash' ? 'active' : ''}
+                onClick={() => update('age55ExcessTreatment', 'keepInOA')}
+              >
+                Keep excess in CPF OA
+              </button>
+            </div>
+            <p>
+              {cpf.age55ExcessTreatment === 'withdrawToCash'
+                ? 'Excess CPF at age 55 is transferred into projected cash from age 55 onward.'
+                : 'Excess CPF at age 55 remains in OA and continues growing at the CPF OA assumption.'}
+            </p>
+          </div>
           <div className="policy-derived-panel cpf-sum-panel">
             <span>Client turns 55 in: <strong>{cpfSums.yearTurning55}</strong></span>
             <span>Estimated BRS: <strong>{formatCurrency(cpfSums.brs)}</strong></span>

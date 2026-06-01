@@ -460,6 +460,53 @@ button {
   margin-top: 9px;
 }
 
+.cpf-treatment-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.cpf-treatment-panel > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.choice-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.choice-buttons button {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.choice-buttons button.active {
+  border-color: var(--gold);
+  background: rgba(196, 154, 67, 0.14);
+  color: var(--navy);
+  box-shadow: inset 0 0 0 1px rgba(196, 154, 67, 0.24);
+}
+
+.cpf-treatment-panel p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .benefit-coverage-block {
   grid-column: 1 / -1;
   margin-top: 10px;
