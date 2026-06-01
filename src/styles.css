@@ -3050,7 +3050,7 @@ textarea:focus {
 
 .policy-summary-table tbody tr.coverage-row th:first-child {
   color: var(--benefit-color, var(--navy));
-  background: color-mix(in srgb, var(--benefit-color, var(--navy)) 18%, white);
+  background: var(--benefit-tint, #eef4fb);
   border-left: 4px solid var(--benefit-color, var(--navy));
 }
 
@@ -3352,6 +3352,9 @@ textarea:focus {
 
 .policy-mini-panel {
   padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
 }
 
 .policy-mini-panel h3,
@@ -3361,16 +3364,35 @@ textarea:focus {
   font-size: 15px;
 }
 
-.policy-mini-panel > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+.policy-mini-panel .summary-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.46fr) minmax(0, 0.54fr);
+  gap: 14px;
+  align-items: start;
   padding: 8px 0;
   border-bottom: 1px solid #edf1f6;
 }
 
-.policy-mini-panel > div:last-child {
+.policy-mini-panel .summary-row:last-child,
+.policy-gap-currency-block:last-child .summary-row:last-child {
   border-bottom: 0;
+}
+
+.policy-mini-panel .summary-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.policy-mini-panel .summary-row strong {
+  min-width: 0;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.35;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .policy-mini-panel .positive strong {
@@ -3390,8 +3412,21 @@ textarea:focus {
   font-size: inherit;
 }
 
-.currency-gap-block {
-  display: block !important;
+.policy-gap-currency-block {
+  padding: 4px 0;
+}
+
+.policy-gap-currency-block + .policy-gap-currency-block {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #dfe7f1;
+}
+
+.policy-gap-currency-block h4 {
+  margin: 0 0 4px;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .policy-notes {
@@ -3603,7 +3638,7 @@ textarea:focus {
 
 .policy-export-table tbody tr.coverage-row th:first-child {
   color: var(--benefit-color, var(--navy));
-  background: color-mix(in srgb, var(--benefit-color, var(--navy)) 18%, white);
+  background: var(--benefit-tint, #eef4fb);
   border-left: 3px solid var(--benefit-color, var(--navy));
 }
 
@@ -3984,6 +4019,15 @@ textarea:focus {
     .form-grid,
     .form-grid.compact {
     grid-template-columns: 1fr;
+  }
+
+  .policy-mini-panel .summary-row {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .policy-mini-panel .summary-row strong {
+    text-align: left;
   }
 
   .benefit-coverage-grid {

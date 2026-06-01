@@ -7,6 +7,7 @@ export const defaultPolicySummaryClient = {
   clientName: 'Client Name',
   dateOfBirth: '',
   age: '',
+  monthlyIncome: '',
   reviewDate: new Date().toLocaleDateString('en-CA'),
   advisorName: 'Koh Wen Yuan',
 };
@@ -90,7 +91,7 @@ export const benefitColorMap = {
   ci: '#b84a62',
   hospitalisation: '#2f855a',
   disabilityIncome: '#d97706',
-  deathAccident: '#c49a43',
+  deathAccident: '#b4234c',
   tpdAccident: '#f59e0b',
   medicalReimbursementAccident: '#0f766e',
   hospitalIncome: '#9a5a2e',
@@ -444,13 +445,15 @@ export function calculatePolicySummary(policies = [], benchmark = defaultPolicyB
   const hospitalisationSummary = hospitalPlans.length > 0
     ? hospitalPlans.join(', ')
     : 'No hospitalisation plan entered';
-  const recommendedDeath = toNumber(benchmark.annualIncome) * toNumber(benchmark.deathMultiplier);
-  const recommendedCi = toNumber(benchmark.annualIncome) * toNumber(benchmark.ciMultiplier);
+  const annualIncome = toNumber(benchmark.annualIncome);
+  const hasBenchmarkIncome = annualIncome > 0;
+  const recommendedDeath = hasBenchmarkIncome ? annualIncome * toNumber(benchmark.deathMultiplier) : null;
+  const recommendedCi = hasBenchmarkIncome ? annualIncome * toNumber(benchmark.ciMultiplier) : null;
   const benchmarkCurrency = normalizeCurrencyLabel(benchmark.currency || 'SGD');
   const currencies = Object.keys(totalsByCurrency);
   const gapsByCurrency = currencies.reduce((items, currency) => {
     const current = totalsByCurrency[currency];
-    const hasBenchmark = currency === benchmarkCurrency;
+    const hasBenchmark = currency === benchmarkCurrency && hasBenchmarkIncome;
     return {
       ...items,
       [currency]: {
@@ -475,8 +478,17 @@ export function calculatePolicySummary(policies = [], benchmark = defaultPolicyB
     hasHospitalisation: hospitalPlans.length > 0,
     recommendedDeath,
     recommendedCi,
-    deathGap: totals.death - recommendedDeath,
-    ciGap: totals.ci - recommendedCi,
+    deathGap: hasBenchmarkIncome ? totals.death - recommendedDeath : null,
+    ciGap: hasBenchmarkIncome ? totals.ci - recommendedCi : null,
+  };
+}
+
+export function getPolicyBenchmarkFromClientProfile(benchmark = defaultPolicyBenchmark, client = {}) {
+  const monthlyIncome = toNumber(client.monthlyIncome);
+  return {
+    ...defaultPolicyBenchmark,
+    ...benchmark,
+    annualIncome: monthlyIncome > 0 ? monthlyIncome * 12 : '',
   };
 }
 
@@ -707,6 +719,24 @@ export function loadPolicySummaryFromStorage() {
 }
 
 export function formatPolicyCurrency(value, currency = 'SGD') {
+  return formatCurrencyExact(value, currency, { emptyAsZero: true });
+}
+
+export function formatCurrencyExact(value, currency = 'SGD', options = {}) {
+  const isEmpty = value === '' || value === null || typeof value === 'undefined';
+  if (isEmpty && !options.emptyAsZero) return '-';
+  const parsed = isEmpty ? 0 : parseCurrencyDisplayNumber(value, currency);
+  if (typeof parsed !== 'number') return typeof value === 'string' && value.trim() ? value.trim() : '-';
+  const currencyLabel = normalizeCurrencyLabel(currency);
+  const amount = Math.abs(parsed);
+  const sign = parsed < 0 ? '-' : '';
+  return `${currencyLabel} ${sign}$${new Intl.NumberFormat('en-SG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)}`;
+}
+
+export function formatPolicyCurrencyLegacy(value, currency = 'SGD') {
   const originalCurrency = toSafeText(currency).trim() || 'SGD';
   const safeCurrency = normalizeCurrency(originalCurrency);
   const amount = toNumber(value);
@@ -859,7 +889,7 @@ function hasBenefitValue(policy, definition) {
 function formatBenefitAmount(policy, definition) {
   const amount = getBenefitAmount(policy, definition.key);
   if (definition.type === 'text') return toSafeText(amount).trim() || '-';
-  return formatPolicyCurrency(amount, policy?.currency);
+  return formatPolicyCurrency(toNumber(amount), policy?.currency);
 }
 
 function getBenefitAmountNumber(policy, benefitKey) {
@@ -939,6 +969,19 @@ function parseFiniteNumber(value) {
   }
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseCurrencyDisplayNumber(value, currency = 'SGD') {
+  if (typeof value !== 'string') return parseFiniteNumber(value);
+  const text = value.trim();
+  if (!text) return null;
+  const currencyLabel = normalizeCurrencyLabel(currency);
+  const withoutCurrency = text
+    .replace(new RegExp(`\\b${currencyLabel}\\b`, 'gi'), '')
+    .replace(/\b(SGD|MYR|USD|EUR|GBP|AUD|CAD|CNY|JPY|HKD)\b/gi, '')
+    .trim();
+  if (/[a-z/]/i.test(withoutCurrency)) return null;
+  return parseFiniteNumber(withoutCurrency);
 }
 
 function buildPolicySummaryDataFilename(clientName, date) {

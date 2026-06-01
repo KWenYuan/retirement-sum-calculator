@@ -92,9 +92,10 @@ export default function App() {
     clientName: profile.clientName,
     dateOfBirth: profile.dateOfBirth,
     age: profile.currentAge,
+    monthlyIncome: profile.monthlyIncome,
     reviewDate: profile.reviewDate,
     advisorName: profile.advisorName,
-  }), [profile.clientName, profile.dateOfBirth, profile.currentAge, profile.reviewDate, profile.advisorName]);
+  }), [profile.clientName, profile.dateOfBirth, profile.currentAge, profile.monthlyIncome, profile.reviewDate, profile.advisorName]);
   const policyCashValueAssets = useMemo(
     () => getPolicyCashValueRetirementAssets(policySummaryData?.policies || []),
     [policySummaryData],

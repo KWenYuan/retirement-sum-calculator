@@ -46,9 +46,13 @@ export function PolicySummaryExportReport({
   benchmark,
   notes,
 }) {
-  const policyChunks = chunkPoliciesForPdf(policies, PDF_POLICY_CHUNK_SIZE);
-  const tablePremiumTotalsByCurrency = calculatePolicyTablePremiumTotalsByCurrency(policies);
-  const reviewDate = client.reviewDate || new Date().toLocaleDateString('en-CA');
+  const safeClient = client || {};
+  const safePolicies = Array.isArray(policies) ? policies.filter(Boolean) : [];
+  const safeSummary = normalizeExportSummary(summary);
+  const safeBenchmark = benchmark || {};
+  const policyChunks = chunkPoliciesForPdf(safePolicies, PDF_POLICY_CHUNK_SIZE);
+  const tablePremiumTotalsByCurrency = calculatePolicyTablePremiumTotalsByCurrency(safePolicies);
+  const reviewDate = safeClient.reviewDate || new Date().toLocaleDateString('en-CA');
   const displayReviewDate = formatDisplayDate(reviewDate);
 
   return (
@@ -56,24 +60,24 @@ export function PolicySummaryExportReport({
       <header className="policy-export-header pdf-avoid-break">
         <div>
           <p>Personal Wealth Planning for</p>
-          <h1>{client.clientName || 'Client'}</h1>
+          <h1>{safeClient.clientName || 'Client'}</h1>
           <span>Current as of {displayReviewDate}</span>
-          <small>Advisor: {client.advisorName || '-'}</small>
+          <small>Advisor: {safeClient.advisorName || '-'}</small>
         </div>
         <img src="/logo.png" alt="Advisor logo" />
       </header>
 
       <section className="policy-export-client pdf-avoid-break">
-        <ExportPill label="Date of birth" value={formatDisplayDate(client.dateOfBirth)} />
-        <ExportPill label="Age" value={client.age || '-'} />
+        <ExportPill label="Date of birth" value={formatDisplayDate(safeClient.dateOfBirth)} />
+        <ExportPill label="Age" value={safeClient.age || '-'} />
         <ExportPill label="Review date" value={displayReviewDate} />
-        <ExportPill label="Policies" value={policies.length} />
+        <ExportPill label="Policies" value={safePolicies.length} />
       </section>
 
       <section className="policy-export-summary-grid pdf-avoid-break">
         <section className="policy-export-summary-table">
           <h2>Premium Summary</h2>
-          <CurrencySummaryTable summary={summary} rows={[
+          <CurrencySummaryTable summary={safeSummary} rows={[
             ['Monthly Premium', 'monthlyPremium'],
             ['Annual Premium', 'annualPremium'],
             ['Single Premium', 'singlePremium'],
@@ -83,7 +87,7 @@ export function PolicySummaryExportReport({
 
         <section className="policy-export-summary-table">
           <h2>Coverage Summary</h2>
-          <CurrencySummaryTable summary={summary} rows={[
+          <CurrencySummaryTable summary={safeSummary} rows={[
             ['Death', 'death'],
             ['TPD', 'tpd'],
             ['ECI', 'eci'],
@@ -95,11 +99,11 @@ export function PolicySummaryExportReport({
             ['Hospital Income', 'hospitalIncome'],
           ]}
           />
-          <p className="policy-export-hospitalisation">Hospitalisation: {summary.hospitalisationSummary}</p>
+          <p className="policy-export-hospitalisation">Hospitalisation: {safeSummary.hospitalisationSummary}</p>
         </section>
       </section>
 
-      <PolicyTimelinePdf policies={policies} />
+      <PolicyTimelinePdf policies={safePolicies} />
 
       {policyChunks.map((chunk, index) => (
         <section
@@ -110,7 +114,7 @@ export function PolicySummaryExportReport({
           <PolicySummaryChunkTable
             policies={chunk}
             chunkIndex={index}
-            summary={summary}
+            summary={safeSummary}
             tablePremiumTotalsByCurrency={tablePremiumTotalsByCurrency}
           />
         </section>
@@ -118,7 +122,7 @@ export function PolicySummaryExportReport({
 
       <section className="policy-export-summary-table policy-export-gap pdf-avoid-break">
         <h2>Policy Gap Summary</h2>
-        <GapSummaryTable summary={summary} benchmark={benchmark} />
+        <GapSummaryTable summary={safeSummary} benchmark={safeBenchmark} />
       </section>
 
       <section className="policy-export-notes pdf-avoid-break">
@@ -131,7 +135,8 @@ export function PolicySummaryExportReport({
 }
 
 function CurrencySummaryTable({ summary, rows }) {
-  const currencies = summary.currencies.length > 0 ? summary.currencies : ['SGD'];
+  const totalsByCurrency = summary?.totalsByCurrency || {};
+  const currencies = Array.isArray(summary?.currencies) && summary.currencies.length > 0 ? summary.currencies : ['SGD'];
   const singleCurrency = currencies.length === 1;
   return (
     <table>
@@ -146,7 +151,7 @@ function CurrencySummaryTable({ summary, rows }) {
           <tr key={key}>
             <th>{label}</th>
             {currencies.map((currency) => (
-              <td key={`${key}-${currency}`}>{formatPolicyCurrencyWithLabel(summary.totalsByCurrency[currency]?.[key] || 0, currency)}</td>
+              <td key={`${key}-${currency}`}>{formatPolicyCurrencyWithLabel(totalsByCurrency[currency]?.[key] || 0, currency)}</td>
             ))}
           </tr>
         ))}
@@ -156,39 +161,40 @@ function CurrencySummaryTable({ summary, rows }) {
 }
 
 function GapSummaryTable({ summary, benchmark }) {
-  const currencies = summary.currencies.length > 0 ? summary.currencies : [summary.benchmarkCurrency];
+  const currencies = Array.isArray(summary?.currencies) && summary.currencies.length > 0 ? summary.currencies : [summary?.benchmarkCurrency || benchmark?.currency || 'SGD'];
+  const gapsByCurrency = summary?.gapsByCurrency || {};
   return (
     <table>
       <thead>
         <tr>
           <th>Currency</th>
-          <th>Death Benchmark / Cover</th>
+          <th>Death Benchmark</th>
+          <th>Current Death Coverage</th>
           <th>Death Gap</th>
-          <th>CI Benchmark / Cover</th>
+          <th>CI Benchmark</th>
+          <th>Current CI Coverage</th>
           <th>CI Gap</th>
         </tr>
       </thead>
       <tbody>
         {currencies.map((currency) => {
-          const gap = summary.gapsByCurrency[currency] || {};
+          const gap = gapsByCurrency[currency] || {
+            hasBenchmark: false,
+            currentDeath: 0,
+            currentCi: 0,
+          };
           return (
             <tr key={`gap-${currency}`}>
               <th>{currency}</th>
-              <td>
-                {gap.hasBenchmark
-                  ? `${formatPolicyCurrencyWithLabel(benchmark.annualIncome * benchmark.deathMultiplier, currency)} / ${formatPolicyCurrencyWithLabel(gap.currentDeath, currency)}`
-                  : `No benchmark / ${formatPolicyCurrencyWithLabel(gap.currentDeath || 0, currency)}`}
-              </td>
+              <td>{gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.recommendedDeath, currency) : 'Not calculated'}</td>
+              <td>{formatPolicyCurrencyWithLabel(gap.currentDeath || 0, currency)}</td>
               <td className={gap.hasBenchmark && gap.deathGap >= 0 ? 'positive' : gap.hasBenchmark ? 'negative' : ''}>
-                {gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.deathGap, currency) : 'Not combined'}
+                {gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.deathGap, currency) : 'Not calculated'}
               </td>
-              <td>
-                {gap.hasBenchmark
-                  ? `${formatPolicyCurrencyWithLabel(benchmark.annualIncome * benchmark.ciMultiplier, currency)} / ${formatPolicyCurrencyWithLabel(gap.currentCi, currency)}`
-                  : `No benchmark / ${formatPolicyCurrencyWithLabel(gap.currentCi || 0, currency)}`}
-              </td>
+              <td>{gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.recommendedCi, currency) : 'Not calculated'}</td>
+              <td>{formatPolicyCurrencyWithLabel(gap.currentCi || 0, currency)}</td>
               <td className={gap.hasBenchmark && gap.ciGap >= 0 ? 'positive' : gap.hasBenchmark ? 'negative' : ''}>
-                {gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.ciGap, currency) : 'Not combined'}
+                {gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.ciGap, currency) : 'Not calculated'}
               </td>
             </tr>
           );
@@ -199,11 +205,13 @@ function GapSummaryTable({ summary, benchmark }) {
 }
 
 function PolicyTimelinePdf({ policies }) {
-  const rows = policies.map((policy) => ({
+  const safePolicies = Array.isArray(policies) ? policies.filter(Boolean) : [];
+  const rows = safePolicies.map((policy, index) => ({
     policy,
     premium: getPremiumPeriod(policy),
     benefits: getBenefitCoverageDetails(policy).filter((period) => period.hasBar),
     status: getTimelineStatus(policy),
+    fallbackId: `policy-${index + 1}`,
   }));
   const benefitDifferenceRows = rows.flatMap((row) => row.benefits.map((period) => ({
     policyName: row.policy.planName || 'Policy',
@@ -230,7 +238,7 @@ function PolicyTimelinePdf({ policies }) {
   const range = Math.max(1, maxAge - minAge);
   const xForAge = (age) => chartX + (((age - minAge) / range) * chartWidth);
   const bar = (period, y, color, label) => {
-    if (!period.hasBar || !isValidAge(period.startAge) || !isValidAge(period.endAge)) {
+    if (!period?.hasBar || !isValidAge(period.startAge) || !isValidAge(period.endAge)) {
       return (
         <text x={chartX + 2} y={y + 7} className="policy-timeline-pdf-unknown">
           {label}
@@ -242,7 +250,7 @@ function PolicyTimelinePdf({ policies }) {
     const barWidth = Math.max(7, endX - x);
     return (
       <g>
-        <rect x={x} y={y} width={barWidth} height="6" rx="3" fill={color} />
+        <rect x={x} y={y} width={barWidth} height="6" rx="3" fill={color || '#15345f'} />
         <text x={Math.min(x + barWidth + 4, chartX + chartWidth - 54)} y={y + 6} className="policy-timeline-pdf-bar-label">
           {period.isLifetime ? 'Lifetime' : period.label}
         </text>
@@ -275,7 +283,7 @@ function PolicyTimelinePdf({ policies }) {
           const rowHeight = rowHeights[index];
           const premiumDisplay = formatPolicyTimelinePremium(row.policy);
           return (
-            <g key={`timeline-pdf-${row.policy.id}`}>
+            <g key={`timeline-pdf-${row.policy.id || row.fallbackId}`}>
               <line x1="0" y1={rowY + rowHeight - 3} x2={width} y2={rowY + rowHeight - 3} stroke="#eef2f6" strokeWidth="1" />
               <text x="0" y={rowY + 7} className="policy-timeline-pdf-name">{truncateText(row.policy.planName || 'Policy', 32)}</text>
               <text x="0" y={rowY + 15} className="policy-timeline-pdf-company">{truncateText(`${row.policy.company || '-'} | ${row.status || '-'}`, 42)}</text>
@@ -289,7 +297,7 @@ function PolicyTimelinePdf({ policies }) {
                 const benefitY = rowY + 14 + (benefitIndex * 7);
                 return (
                   <g key={`timeline-pdf-${row.policy.id}-${period.key}`}>
-                    <rect x={x} y={benefitY} width={barWidth} height="4" rx="2" fill={getBenefitColor(period.key)} />
+                    <rect x={x} y={benefitY} width={barWidth} height="4" rx="2" fill={getBenefitColor(period.key) || '#15345f'} />
                     <text x={Math.min(x + barWidth + 4, chartX + chartWidth - 54)} y={benefitY + 4} className="policy-timeline-pdf-bar-label">
                       {truncateText(`${period.label}: ${period.periodLabel}`, 26)}
                     </text>
@@ -338,13 +346,14 @@ function PolicySummaryChunkTable({
   summary,
   tablePremiumTotalsByCurrency,
 }) {
+  const safePolicies = Array.isArray(policies) ? policies.filter(Boolean) : [];
   return (
     <table className="policy-export-table">
       <thead>
         <tr>
           <th>Field</th>
-          {policies.map((policy, index) => (
-            <th key={`${policy.id}-header`}>
+          {safePolicies.map((policy, index) => (
+            <th key={`${policy.id || `policy-${index}`}-header`}>
               {policy.planName || `Policy ${(chunkIndex * PDF_POLICY_CHUNK_SIZE) + index + 1}`}
             </th>
           ))}
@@ -362,7 +371,7 @@ function PolicySummaryChunkTable({
             } : undefined}
           >
             <th>{row.label}</th>
-            {policies.map((policy) => <td key={`${policy.id}-${row.label}`}>{row.get(policy)}</td>)}
+            {safePolicies.map((policy, index) => <td key={`${policy.id || index}-${row.label}`}>{row.get(policy)}</td>)}
             <td className="policy-export-total-column">
               <PdfCurrencyTotalValue
                 row={row}
@@ -381,9 +390,9 @@ function PdfCurrencyTotalValue({ row, summary, tablePremiumTotalsByCurrency }) {
   if (!row.totalKey) return '-';
   const totalsByCurrency = row.label === 'Monthly Premium' || row.label === 'Annual Premium'
     ? tablePremiumTotalsByCurrency
-    : summary.totalsByCurrency;
+    : summary?.totalsByCurrency || {};
   const values = formatCurrencyTotals(totalsByCurrency, row.totalKey, {
-    includeZero: summary.currencies.length <= 1,
+    includeZero: !Array.isArray(summary?.currencies) || summary.currencies.length <= 1,
   });
   if (values.length === 0) return '-';
   return (
@@ -394,9 +403,10 @@ function PdfCurrencyTotalValue({ row, summary, tablePremiumTotalsByCurrency }) {
 }
 
 function chunkPoliciesForPdf(policies, chunkSize = 4) {
+  const safePolicies = Array.isArray(policies) ? policies.filter(Boolean) : [];
   const chunks = [];
-  for (let index = 0; index < policies.length; index += chunkSize) {
-    chunks.push(policies.slice(index, index + chunkSize));
+  for (let index = 0; index < safePolicies.length; index += chunkSize) {
+    chunks.push(safePolicies.slice(index, index + chunkSize));
   }
   return chunks.length > 0 ? chunks : [[]];
 }
@@ -425,11 +435,24 @@ function SummaryTable({ rows }) {
   );
 }
 
+function normalizeExportSummary(summary = {}) {
+  const currencies = Array.isArray(summary.currencies) ? summary.currencies : [];
+  const benchmarkCurrency = summary.benchmarkCurrency || currencies[0] || 'SGD';
+  return {
+    ...summary,
+    currencies,
+    benchmarkCurrency,
+    totalsByCurrency: summary.totalsByCurrency || {},
+    gapsByCurrency: summary.gapsByCurrency || {},
+    hospitalisationSummary: summary.hospitalisationSummary || 'No hospitalisation plan entered',
+  };
+}
+
 function getTimelineStatus(policy) {
   if (policy.policyStatus === 'Lapsed' || policy.payStatus === 'Lapsed') return 'Lapsed';
-  if (policy.coverageStatus === 'Ended') return 'Expired / Ended';
   if (policy.payStatus === 'Fully paid' || policy.premiumPayableType === 'Fully paid') return 'Fully paid';
-  return policy.coverageStatus || policy.policyStatus || 'Active';
+  if (policy.policyStatus === 'Matured' || policy.policyStatus === 'Cancelled') return 'Expired / Ended';
+  return policy.policyStatus || 'Active';
 }
 
 function getStatusClass(policy) {

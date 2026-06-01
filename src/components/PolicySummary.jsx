@@ -24,6 +24,7 @@ import {
   formatPolicyTimelinePremium,
   getBenefitAmountDisplay,
   getBenefitCoverageDetails,
+  getPolicyBenchmarkFromClientProfile,
   getPolicyTablePremiumValues,
   getPremiumPeriod,
   importPolicySummaryData,
@@ -68,6 +69,7 @@ function mergeClientDetails(client, sharedClient) {
     clientName: sharedClient.clientName || client.clientName,
     dateOfBirth: sharedClient.dateOfBirth || client.dateOfBirth,
     age: sharedClient.age || client.age,
+    monthlyIncome: sharedClient.monthlyIncome ?? client.monthlyIncome,
     reviewDate: sharedClient.reviewDate || client.reviewDate,
     advisorName: sharedClient.advisorName || client.advisorName,
   };
@@ -95,10 +97,14 @@ export function PolicySummary({
   const [selectedTimelinePolicyId, setSelectedTimelinePolicyId] = useState(null);
   const importRef = useRef(null);
   const reportRef = useRef(null);
-  const summary = useMemo(() => calculatePolicySummary(policies, benchmark), [policies, benchmark]);
   const selectedTimelinePolicy = policies.find((policy) => policy.id === selectedTimelinePolicyId) || policies[0] || null;
   const exportDate = new Date().toLocaleDateString('en-CA');
   const displayClient = useMemo(() => mergeClientDetails(client, sharedClient), [client, sharedClient]);
+  const effectiveBenchmark = useMemo(
+    () => getPolicyBenchmarkFromClientProfile(benchmark, displayClient),
+    [benchmark, displayClient],
+  );
+  const summary = useMemo(() => calculatePolicySummary(policies, effectiveBenchmark), [policies, effectiveBenchmark]);
   const dataState = useMemo(() => ({ client: displayClient, policies, benchmark, notes }), [displayClient, policies, benchmark, notes]);
 
   useEffect(() => {
@@ -165,7 +171,7 @@ export function PolicySummary({
       }).from(reportRef.current).save();
     } catch (pdfError) {
       console.error('Policy summary PDF export failed:', pdfError);
-      setError('Policy Summary PDF export failed. Please try again.');
+      setError('Policy Summary PDF export failed. Please check the console for details.');
     } finally {
       setIsExporting(false);
     }
@@ -238,6 +244,7 @@ export function PolicySummary({
                 <TextField label="Client name" value={client.clientName} onChange={(value) => setClient((current) => ({ ...current, clientName: value }))} />
                 <TextField label="Date of birth" value={client.dateOfBirth} onChange={(value) => setClient((current) => ({ ...current, dateOfBirth: value }))} />
                 <NumberField label="Age" value={client.age} onChange={(value) => setClient((current) => ({ ...current, age: value }))} />
+                <NumberField label="Monthly income" prefix="$" value={client.monthlyIncome} onChange={(value) => setClient((current) => ({ ...current, monthlyIncome: value }))} />
                 <TextField label="Review date" value={client.reviewDate} onChange={(value) => setClient((current) => ({ ...current, reviewDate: value }))} />
                 <TextField label="Advisor name" value={client.advisorName} onChange={(value) => setClient((current) => ({ ...current, advisorName: value }))} />
               </div>
@@ -269,10 +276,10 @@ export function PolicySummary({
           <details className="input-accordion panel">
             <summary><span>Coverage Benchmark</span></summary>
             <div className="accordion-content form-grid compact input-compact-grid">
-              <NumberField label="Annual income" prefix="$" value={benchmark.annualIncome} onChange={(value) => setBenchmark((current) => ({ ...current, annualIncome: value }))} />
               <NumberField label="Death benchmark" suffix="x income" value={benchmark.deathMultiplier} onChange={(value) => setBenchmark((current) => ({ ...current, deathMultiplier: value }))} />
               <NumberField label="CI benchmark" suffix="x income" value={benchmark.ciMultiplier} onChange={(value) => setBenchmark((current) => ({ ...current, ciMultiplier: value }))} />
             </div>
+            <p className="field-helper">Benchmarks use Monthly Income from Client Profile multiplied by 12.</p>
           </details>
 
           <details className="input-accordion panel">
@@ -289,7 +296,7 @@ export function PolicySummary({
           client={displayClient}
           policies={policies}
           summary={summary}
-          benchmark={benchmark}
+          benchmark={effectiveBenchmark}
           notes={notes}
           selectedTimelinePolicy={selectedTimelinePolicy}
           setSelectedTimelinePolicyId={setSelectedTimelinePolicyId}
@@ -302,7 +309,7 @@ export function PolicySummary({
           client={displayClient}
           policies={policies}
           summary={summary}
-          benchmark={benchmark}
+          benchmark={effectiveBenchmark}
           notes={notes}
         />
       </div>
@@ -523,25 +530,29 @@ function PolicySummaryReport({ client, policies, summary, benchmark, notes, sele
 
         <section className="policy-mini-panel avoid-break">
           <h3>Policy Gap Summary</h3>
-          <SummaryLine label={`${summary.benchmarkCurrency} annual income benchmark`} value={formatPolicyCurrencyWithLabel(benchmark.annualIncome, summary.benchmarkCurrency)} />
-          {summary.currencies.map((currency) => {
-            const gap = summary.gapsByCurrency[currency];
+          {(summary.currencies.length > 0 ? summary.currencies : [summary.benchmarkCurrency]).map((currency) => {
+            const gap = summary.gapsByCurrency[currency] || {
+              hasBenchmark: false,
+              currentDeath: 0,
+              currentCi: 0,
+            };
             return (
-              <div className="currency-gap-block" key={currency}>
-                <span>{currency}</span>
-                {gap.hasBenchmark ? (
-                  <strong>
-                    Death gap: {formatPolicyCurrencyWithLabel(gap.deathGap, currency)}
-                    <br />
-                    CI gap: {formatPolicyCurrencyWithLabel(gap.ciGap, currency)}
-                  </strong>
-                ) : (
-                  <strong>
-                    Death cover: {formatPolicyCurrencyWithLabel(gap.currentDeath, currency)}
-                    <br />
-                    No {currency} benchmark entered
-                  </strong>
-                )}
+              <div className="policy-gap-currency-block" key={currency}>
+                {summary.currencies.length > 1 && <h4>{currency}</h4>}
+                <SummaryLine label="Death Benchmark" value={gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.recommendedDeath, currency) : 'Not calculated'} />
+                <SummaryLine label="Current Death Coverage" value={formatPolicyCurrencyWithLabel(gap.currentDeath || 0, currency)} />
+                <SummaryLine
+                  label="Death Gap"
+                  value={gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.deathGap, currency) : 'Not calculated'}
+                  tone={gap.hasBenchmark ? (gap.deathGap >= 0 ? 'positive' : 'negative') : ''}
+                />
+                <SummaryLine label="CI Benchmark" value={gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.recommendedCi, currency) : 'Not calculated'} />
+                <SummaryLine label="Current CI Coverage" value={formatPolicyCurrencyWithLabel(gap.currentCi || 0, currency)} />
+                <SummaryLine
+                  label="CI Gap"
+                  value={gap.hasBenchmark ? formatPolicyCurrencyWithLabel(gap.ciGap, currency) : 'Not calculated'}
+                  tone={gap.hasBenchmark ? (gap.ciGap >= 0 ? 'positive' : 'negative') : ''}
+                />
               </div>
             );
           })}
@@ -756,9 +767,9 @@ function TimelineBar({ period, type, style }) {
 
 function getTimelineStatus(policy) {
   if (policy.policyStatus === 'Lapsed' || policy.payStatus === 'Lapsed') return 'Lapsed';
-  if (policy.coverageStatus === 'Ended') return 'Expired / Ended';
   if (policy.payStatus === 'Fully paid' || policy.premiumPayableType === 'Fully paid') return 'Fully paid';
-  return policy.coverageStatus || policy.policyStatus || 'Active';
+  if (policy.policyStatus === 'Matured' || policy.policyStatus === 'Cancelled') return 'Expired / Ended';
+  return policy.policyStatus || 'Active';
 }
 
 function getStatusClass(policy) {
@@ -786,7 +797,7 @@ function SummaryPill({ label, value }) {
 
 function SummaryLine({ label, value, tone }) {
   return (
-    <div className={tone || ''}>
+    <div className={`summary-row ${tone || ''}`}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
