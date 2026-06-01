@@ -11,6 +11,7 @@ import {
   projectInvestmentAccumulatedAtAge,
   projectPolicyAccumulatedAtAge,
 } from '../utils/projections.js';
+import { formatPolicyCurrencyWithLabel } from '../utils/policySummary.js';
 
 const POLICY_STRUCTURES = [
   'Endowment / maturity plan',
@@ -24,28 +25,34 @@ const POLICY_STRUCTURES = [
 export function ProfileSection({ profile, setProfile }) {
   const update = (key, value) => setProfile((current) => ({ ...current, [key]: value }));
   return (
-    <>
-      <AccordionSection title="Client Profile" defaultOpen>
-        <div className="form-grid compact input-compact-grid">
-          <TextField label="Client name" value={profile.clientName} onChange={(value) => update('clientName', value)} />
-          <NumberField label="Current age" value={profile.currentAge} onChange={(value) => update('currentAge', value)} />
-          <NumberField label="Retirement age" value={profile.retirementAge} onChange={(value) => update('retirementAge', value)} />
-          <NumberField label="Monthly income" prefix="$" value={profile.monthlyIncome} onChange={(value) => update('monthlyIncome', value)} />
-          <NumberField label="Monthly expenses" prefix="$" value={profile.monthlyExpenses} onChange={(value) => update('monthlyExpenses', value)} />
-          <NumberField label="Monthly savings" prefix="$" value={profile.monthlySavings} onChange={(value) => update('monthlySavings', value)} />
-        </div>
-      </AccordionSection>
+    <AccordionSection title="Client Profile" defaultOpen>
+      <div className="form-grid compact input-compact-grid">
+        <TextField label="Client name" value={profile.clientName} onChange={(value) => update('clientName', value)} />
+        <TextField label="Date of birth" value={profile.dateOfBirth} onChange={(value) => update('dateOfBirth', value)} />
+        <NumberField label="Current age" value={profile.currentAge} onChange={(value) => update('currentAge', value)} />
+        <TextField label="Review date" value={profile.reviewDate} onChange={(value) => update('reviewDate', value)} />
+        <TextField label="Advisor name" value={profile.advisorName} onChange={(value) => update('advisorName', value)} />
+        <NumberField label="Retirement age" value={profile.retirementAge} onChange={(value) => update('retirementAge', value)} />
+        <NumberField label="Monthly income" prefix="$" value={profile.monthlyIncome} onChange={(value) => update('monthlyIncome', value)} />
+        <NumberField label="Monthly expenses" prefix="$" value={profile.monthlyExpenses} onChange={(value) => update('monthlyExpenses', value)} />
+        <NumberField label="Monthly savings" prefix="$" value={profile.monthlySavings} onChange={(value) => update('monthlySavings', value)} />
+      </div>
+    </AccordionSection>
+  );
+}
 
-      <AccordionSection title="Retirement Goal">
-        <div className="form-grid compact input-compact-grid">
-          <NumberField label="Desired monthly income" prefix="$" value={profile.desiredMonthlyIncome} onChange={(value) => update('desiredMonthlyIncome', value)} />
-          <NumberField label="Inflation rate" suffix="%" step={0.1} value={profile.inflationRate} onChange={(value) => update('inflationRate', value)} />
-          <NumberField label="Retirement duration" suffix="years" value={profile.retirementDuration} onChange={(value) => update('retirementDuration', value)} />
-          <NumberField label="Withdrawal rate" suffix="%" step={0.1} value={profile.withdrawalRate} onChange={(value) => update('withdrawalRate', value)} />
-          <NumberField label="General return rate" suffix="%" step={0.1} value={profile.generalReturnRate} onChange={(value) => update('generalReturnRate', value)} />
-        </div>
-      </AccordionSection>
-    </>
+export function RetirementGoalSection({ profile, setProfile }) {
+  const update = (key, value) => setProfile((current) => ({ ...current, [key]: value }));
+  return (
+    <AccordionSection title="Retirement Assumptions" defaultOpen>
+      <div className="form-grid compact input-compact-grid">
+        <NumberField label="Desired monthly income" prefix="$" value={profile.desiredMonthlyIncome} onChange={(value) => update('desiredMonthlyIncome', value)} />
+        <NumberField label="Inflation rate" suffix="%" step={0.1} value={profile.inflationRate} onChange={(value) => update('inflationRate', value)} />
+        <NumberField label="Retirement duration" suffix="years" value={profile.retirementDuration} onChange={(value) => update('retirementDuration', value)} />
+        <NumberField label="Withdrawal rate" suffix="%" step={0.1} value={profile.withdrawalRate} onChange={(value) => update('withdrawalRate', value)} />
+        <NumberField label="General return rate" suffix="%" step={0.1} value={profile.generalReturnRate} onChange={(value) => update('generalReturnRate', value)} />
+      </div>
+    </AccordionSection>
   );
 }
 
@@ -129,6 +136,42 @@ export function CashSection({ cash, setCash }) {
         </div>
       </details>
       {!isIncluded && <p className="excluded-note">Cash / Savings is currently excluded from retirement projections.</p>}
+    </AccordionSection>
+  );
+}
+
+export function PolicyCashValueReview({ policySummaryPolicies = [], retirementPolicies = [], onToggle }) {
+  const policiesWithCashValue = policySummaryPolicies.filter((policy) => Number(policy.cashValue) > 0);
+  if (policiesWithCashValue.length === 0) return null;
+
+  return (
+    <AccordionSection title="Policy Cash Values">
+      <div className="policy-cash-review">
+        <p className="field-helper">Only policy cash values marked as included are counted in the retirement projection. Check manually to avoid double counting.</p>
+        <div className="policy-cash-review-table">
+          <span>Policy</span>
+          <span>Cash Value</span>
+          <span>Include</span>
+          {policiesWithCashValue.map((policy) => {
+            const mayDuplicate = hasPossibleRetirementPolicyMatch(policy, retirementPolicies);
+            return (
+              <div className="policy-cash-review-row" key={policy.id}>
+                <strong>
+                  {policy.planName || 'Policy'}
+                  {policy.company && <small>{policy.company}</small>}
+                  {mayDuplicate && <em>This policy may already exist in Retirement Projection. Check to avoid double counting.</em>}
+                </strong>
+                <b>{formatPolicyCurrencyWithLabel(policy.cashValue, policy.currency)}</b>
+                <Toggle
+                  label="Include"
+                  checked={Boolean(policy.includeCashValueInRetirement)}
+                  onChange={(value) => onToggle(policy.id, value)}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </AccordionSection>
   );
 }
@@ -356,6 +399,21 @@ function PolicyCard({ policy, isEditing, setEditingId, updatePolicy, duplicatePo
       )}
     </div>
   );
+}
+
+function hasPossibleRetirementPolicyMatch(policySummaryPolicy, retirementPolicies) {
+  const planName = String(policySummaryPolicy.planName || '').trim().toLowerCase();
+  const company = String(policySummaryPolicy.company || '').trim().toLowerCase();
+  if (!planName && !company) return false;
+  return retirementPolicies.some((policy) => {
+    const name = String(policy.name || '').trim().toLowerCase();
+    const type = String(policy.type || '').trim().toLowerCase();
+    return (
+      (planName && name && (name === planName || name.includes(planName) || planName.includes(name))) ||
+      (company && name && name.includes(company)) ||
+      (company && type && type.includes(company))
+    );
+  });
 }
 
 function InvestmentCard({ investment, isEditing, setEditingId, updateInvestment, duplicateInvestment, removeInvestment, profile, scenarioRate }) {

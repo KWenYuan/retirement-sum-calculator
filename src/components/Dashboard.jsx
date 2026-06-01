@@ -26,7 +26,7 @@ import {
 } from '../utils/projections.js';
 
 export function Dashboard({
-  viewMode = 'advisor',
+  clientFacing = false,
   profile,
   cpf,
   srs,
@@ -54,7 +54,7 @@ export function Dashboard({
   dataMessage,
   dataError,
 }) {
-  const isPresentation = viewMode === 'presentation';
+  const isClientFacing = clientFacing;
   const [chartView, setChartView] = useState('total-components');
   const [highlightedSeries, setHighlightedSeries] = useState(null);
   const { chartData, series } = useMemo(
@@ -83,9 +83,9 @@ export function Dashboard({
       <section className="hero-panel">
         <div>
           <p className="client-label">{profile.clientName || 'Client'}</p>
-          <h1>{isPresentation ? 'Retirement projection summary' : `Retirement projection at age ${profile.retirementAge}`}</h1>
+          <h1>{isClientFacing ? 'Retirement projection summary' : `Retirement projection at age ${profile.retirementAge}`}</h1>
           <p className="hero-subtitle">A meeting-ready view of CPF, SRS, policies, investments and cash against the client’s retirement income target.</p>
-          {isPresentation && (
+          {isClientFacing && (
             <div className="presentation-hero-stats">
               <HeroStat label="Current age" value={profile.currentAge} />
               <HeroStat label="Retirement age" value={profile.retirementAge} />
@@ -97,10 +97,10 @@ export function Dashboard({
       </section>
 
       {exportError && <div className="export-error">{exportError}</div>}
-      {!isPresentation && dataError && <div className="export-error">{dataError}</div>}
-      {!isPresentation && dataMessage && <div className="data-message">{dataMessage}</div>}
+      {!isClientFacing && dataError && <div className="export-error">{dataError}</div>}
+      {!isClientFacing && dataMessage && <div className="data-message">{dataMessage}</div>}
 
-      {!isPresentation && (
+      {!isClientFacing && (
         <section className="panel data-export-panel">
         <div>
           <h2>Data & Export</h2>
@@ -127,7 +127,7 @@ export function Dashboard({
         </section>
       )}
 
-      <section className={`metric-grid ${isPresentation ? 'presentation-metric-grid' : ''}`}>
+      <section className={`metric-grid ${isClientFacing ? 'presentation-metric-grid' : ''}`}>
         <MetricCard label="Projected retirement amount" value={formatCurrency(retirementPoint.total)} tone="navy" />
         <MetricCard label="Required retirement amount" value={formatCurrency(needs.requiredAmount)} />
         <MetricCard
@@ -135,7 +135,7 @@ export function Dashboard({
           value={formatCurrency(needs.surplusShortfall)}
           tone={needs.surplusShortfall >= 0 ? 'positive' : 'alert'}
         />
-        {isPresentation ? (
+        {isClientFacing ? (
           <>
             <MetricCard label="Projected monthly income" value={`${formatCurrency(incomeSources.totalMonthlyIncome)}/month`} />
             <MetricCard label={`Total lump sum at age ${selectedAge}`} value={formatCurrency(payoutSummary.lumpSum)} />
@@ -283,7 +283,7 @@ export function Dashboard({
         </section>
       </section>
 
-      {!isPresentation && (
+      {!isClientFacing && (
         <section className="panel">
         <div className="section-header">
           <h2>Start Now vs Start Later</h2>
@@ -301,7 +301,7 @@ export function Dashboard({
         </section>
       )}
 
-      {!isPresentation && (
+      {!isClientFacing && (
         <section className="panel advisor-panel">
         <div className="section-header">
           <h2>Advisor Insight</h2>

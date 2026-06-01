@@ -11,6 +11,7 @@ import {
   projectSrs,
   isCashIncludedInProjection,
 } from '../utils/projections.js';
+import { formatPolicyCurrencyWithLabel } from '../utils/policySummary.js';
 
 const asNumber = (value) => {
   const parsed = Number(value);
@@ -36,11 +37,12 @@ export function ExportReport({
   advisorInsight,
   disclaimer,
   exportDate,
+  policyCashValueAssets = [],
 }) {
   const includeCash = isCashIncludedInProjection(cash);
   const includeCpf = hasCpfProjectionData(cpf);
   const includeCpf55 = hasCpfFrsMilestoneData(cpf);
-  const currentAssets = calculateCurrentAssets({ cpf, srs, policies, investments, cash });
+  const currentAssets = calculateCurrentAssets({ cpf, srs, policies, investments, cash, policyCashValueAssets });
   const assetBreakdown = [
     ...(includeCpf ? [['CPF', retirementPoint.cpf]] : []),
     ['SRS', retirementPoint.srs],
@@ -358,7 +360,7 @@ function SimpleTable({ headers, rows, emptyMessage = 'No records entered.' }) {
   );
 }
 
-function calculateCurrentAssets({ cpf, srs, policies, investments, cash }) {
+function calculateCurrentAssets({ cpf, srs, policies, investments, cash, policyCashValueAssets = [] }) {
   const rows = [];
   let total = 0;
 
@@ -388,6 +390,19 @@ function calculateCurrentAssets({ cpf, srs, policies, investments, cash }) {
 
   const totalPolicyValue = policies.reduce((sum, policy) => sum + asNumber(policy.currentValue), 0);
   if (policies.length > 0) rows.push(['Total current policy value', formatCurrency(totalPolicyValue), 'Policy values entered']);
+
+  if (policyCashValueAssets.length > 0) {
+    rows.push(['Policy Cash Values Included', 'Selected policy cash values', 'Only policies marked as included are counted']);
+    policyCashValueAssets.forEach((asset) => {
+      const isSgd = String(asset.currency || 'SGD').toUpperCase() === 'SGD';
+      rows.push([
+        `${asset.planName}${asset.company ? ` (${asset.company})` : ''}`,
+        formatPolicyCurrencyWithLabel(asset.cashValue, asset.currency),
+        isSgd ? 'Included from Policy Summary' : 'Shown separately; not combined without FX conversion',
+      ]);
+      if (isSgd) total += asNumber(asset.cashValue);
+    });
+  }
 
   investments.forEach((investment) => {
     const value = asNumber(investment.currentValue);

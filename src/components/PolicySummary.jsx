@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import html2pdf from 'html2pdf.js';
 import { Copy, Download, FileJson, FolderUp, Pencil, Plus, Trash2 } from 'lucide-react';
-import { NumberField, SelectField, TextField } from './FormControls.jsx';
+import { NumberField, SelectField, TextField, Toggle } from './FormControls.jsx';
 import { PolicySummaryExportReport } from './PolicySummaryExportReport.jsx';
 import {
   benefitCoverageDefinitions,
@@ -61,7 +61,28 @@ const policyRows = [
   { label: 'Notes', get: (policy) => textValue(policy.notes) },
 ];
 
-export function PolicySummary({ viewMode = 'advisor' }) {
+function mergeClientDetails(client, sharedClient) {
+  if (!sharedClient) return client;
+  return {
+    ...client,
+    clientName: sharedClient.clientName || client.clientName,
+    dateOfBirth: sharedClient.dateOfBirth || client.dateOfBirth,
+    age: sharedClient.age || client.age,
+    reviewDate: sharedClient.reviewDate || client.reviewDate,
+    advisorName: sharedClient.advisorName || client.advisorName,
+  };
+}
+
+export function PolicySummary({
+  editable = true,
+  showClientDetails = true,
+  showReport = true,
+  showPdfExport = true,
+  showJsonActions = true,
+  sharedClient = null,
+  onClientImport,
+  onDataChange,
+}) {
   const savedData = useMemo(() => loadPolicySummaryFromStorage(), []);
   const [client, setClient] = useState(savedData?.client || defaultPolicySummaryClient);
   const [policies, setPolicies] = useState(savedData?.policies || restorePolicySummaryData().policies);
@@ -74,18 +95,19 @@ export function PolicySummary({ viewMode = 'advisor' }) {
   const [selectedTimelinePolicyId, setSelectedTimelinePolicyId] = useState(null);
   const importRef = useRef(null);
   const reportRef = useRef(null);
-  const isPresentation = viewMode === 'presentation';
   const summary = useMemo(() => calculatePolicySummary(policies, benchmark), [policies, benchmark]);
   const selectedTimelinePolicy = policies.find((policy) => policy.id === selectedTimelinePolicyId) || policies[0] || null;
   const exportDate = new Date().toLocaleDateString('en-CA');
-  const dataState = useMemo(() => ({ client, policies, benchmark, notes }), [client, policies, benchmark, notes]);
+  const displayClient = useMemo(() => mergeClientDetails(client, sharedClient), [client, sharedClient]);
+  const dataState = useMemo(() => ({ client: displayClient, policies, benchmark, notes }), [displayClient, policies, benchmark, notes]);
 
   useEffect(() => {
     savePolicySummaryToStorage(dataState);
-  }, [dataState]);
+    onDataChange?.(dataState);
+  }, [dataState, onDataChange]);
 
   const addPolicy = () => {
-    const policy = createPolicySummaryPolicy({ planName: 'New Policy', owner: client.clientName || 'Client', lifeAssured: client.clientName || 'Client' });
+    const policy = createPolicySummaryPolicy({ planName: 'New Policy', owner: displayClient.clientName || 'Client', lifeAssured: displayClient.clientName || 'Client' });
     setPolicies((current) => [...current, policy]);
     setEditingId(policy.id);
   };
@@ -114,7 +136,7 @@ export function PolicySummary({ viewMode = 'advisor' }) {
     try {
       await html2pdf().set({
         margin: 6,
-        filename: buildPolicySummaryPdfFilename(client.clientName, exportDate),
+        filename: buildPolicySummaryPdfFilename(displayClient.clientName, exportDate),
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1040 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
@@ -129,7 +151,7 @@ export function PolicySummary({ viewMode = 'advisor' }) {
   };
 
   const exportJson = () => {
-    downloadPolicySummaryData(dataState, client.clientName, exportDate);
+    downloadPolicySummaryData(dataState, displayClient.clientName, exportDate);
     setMessage('Policy summary data exported successfully.');
     setError('');
   };
@@ -145,6 +167,7 @@ export function PolicySummary({ viewMode = 'advisor' }) {
       setPolicies(restored.policies);
       setBenchmark(restored.benchmark);
       setNotes(restored.notes);
+      onClientImport?.(restored.client);
       const policyCount = restored.importReport?.policyCount ?? restored.policies.length;
       const cleanedMessage = restored.importReport?.cleanedPolicies > 0
         ? ' Some missing or unknown fields were converted to safe defaults.'
@@ -163,15 +186,17 @@ export function PolicySummary({ viewMode = 'advisor' }) {
       <section className="policy-summary-hero panel">
         <div>
           <p>Personal Wealth Planning</p>
-          <h1>Policy Summary for {client.clientName || 'Client'}</h1>
-          <span>Current as of {formatDisplayDate(client.reviewDate || exportDate)}</span>
+          <h1>Policy Summary for {displayClient.clientName || 'Client'}</h1>
+          <span>Current as of {formatDisplayDate(displayClient.reviewDate || exportDate)}</span>
         </div>
         <div className="policy-summary-actions">
-          <button className="export-button" type="button" onClick={exportPdf} disabled={isExporting}>
-            <Download size={17} />
-            {isExporting ? 'Generating PDF...' : 'Export Policy Summary PDF'}
-          </button>
-          {!isPresentation && (
+          {showPdfExport && (
+            <button className="export-button" type="button" onClick={exportPdf} disabled={isExporting}>
+              <Download size={17} />
+              {isExporting ? 'Generating PDF...' : 'Export Policy Summary PDF'}
+            </button>
+          )}
+          {showJsonActions && (
             <>
               <button className="ghost-button" type="button" onClick={exportJson}><FileJson size={16} /> Export Policy Summary Data</button>
               <button className="ghost-button" type="button" onClick={() => importRef.current?.click()}><FolderUp size={16} /> Import Policy Summary Data</button>
@@ -183,18 +208,20 @@ export function PolicySummary({ viewMode = 'advisor' }) {
       {message && <div className="data-message policy-message">{message}</div>}
       {error && <div className="export-error policy-message">{error}</div>}
 
-      {!isPresentation && (
+      {editable && (
         <section className="policy-summary-editor">
-          <details className="input-accordion panel" open>
-            <summary><span>Client Details</span></summary>
-            <div className="accordion-content form-grid compact input-compact-grid">
-              <TextField label="Client name" value={client.clientName} onChange={(value) => setClient((current) => ({ ...current, clientName: value }))} />
-              <TextField label="Date of birth" value={client.dateOfBirth} onChange={(value) => setClient((current) => ({ ...current, dateOfBirth: value }))} />
-              <NumberField label="Age" value={client.age} onChange={(value) => setClient((current) => ({ ...current, age: value }))} />
-              <TextField label="Review date" value={client.reviewDate} onChange={(value) => setClient((current) => ({ ...current, reviewDate: value }))} />
-              <TextField label="Advisor name" value={client.advisorName} onChange={(value) => setClient((current) => ({ ...current, advisorName: value }))} />
-            </div>
-          </details>
+          {showClientDetails && (
+            <details className="input-accordion panel" open>
+              <summary><span>Client Details</span></summary>
+              <div className="accordion-content form-grid compact input-compact-grid">
+                <TextField label="Client name" value={client.clientName} onChange={(value) => setClient((current) => ({ ...current, clientName: value }))} />
+                <TextField label="Date of birth" value={client.dateOfBirth} onChange={(value) => setClient((current) => ({ ...current, dateOfBirth: value }))} />
+                <NumberField label="Age" value={client.age} onChange={(value) => setClient((current) => ({ ...current, age: value }))} />
+                <TextField label="Review date" value={client.reviewDate} onChange={(value) => setClient((current) => ({ ...current, reviewDate: value }))} />
+                <TextField label="Advisor name" value={client.advisorName} onChange={(value) => setClient((current) => ({ ...current, advisorName: value }))} />
+              </div>
+            </details>
+          )}
 
           <details className="input-accordion panel" open>
             <summary>
@@ -236,20 +263,22 @@ export function PolicySummary({ viewMode = 'advisor' }) {
         </section>
       )}
 
-      <PolicySummaryReport
-        client={client}
-        policies={policies}
-        summary={summary}
-        benchmark={benchmark}
-        notes={notes}
-        selectedTimelinePolicy={selectedTimelinePolicy}
-        setSelectedTimelinePolicyId={setSelectedTimelinePolicyId}
-      />
+      {showReport && (
+        <PolicySummaryReport
+          client={displayClient}
+          policies={policies}
+          summary={summary}
+          benchmark={benchmark}
+          notes={notes}
+          selectedTimelinePolicy={selectedTimelinePolicy}
+          setSelectedTimelinePolicyId={setSelectedTimelinePolicyId}
+        />
+      )}
 
       <div className="policy-export-hidden" aria-hidden="true">
         <PolicySummaryExportReport
           refNode={reportRef}
-          client={client}
+          client={displayClient}
           policies={policies}
           summary={summary}
           benchmark={benchmark}
@@ -398,13 +427,20 @@ function PolicySummaryCard({ policy, isEditing, setEditingId, updatePolicy, dupl
             <summary>Policy Values</summary>
             <div className="form-grid compact input-compact-grid">
               <NumberField label="Cash value" prefix="$" value={policy.cashValue} onChange={(value) => updatePolicy(policy.id, 'cashValue', value)} />
+              <Toggle
+                label="Include cash value in retirement projection"
+                checked={Boolean(policy.includeCashValueInRetirement)}
+                onChange={(value) => updatePolicy(policy.id, 'includeCashValueInRetirement', value)}
+              />
             </div>
+            <p className="field-helper">If enabled, this policy's current cash value will be added as an asset in the Retirement Projection.</p>
           </details>
           <details className="advanced-block">
             <summary>Notes</summary>
-            <div className="form-grid compact input-compact-grid">
-              <TextField label="Notes" value={policy.notes} onChange={(value) => updatePolicy(policy.id, 'notes', value)} />
-            </div>
+            <label className="field policy-notes-field">
+              <span>Notes</span>
+              <textarea value={policy.notes} onChange={(event) => updatePolicy(policy.id, 'notes', event.target.value)} />
+            </label>
           </details>
         </div>
       )}

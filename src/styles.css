@@ -96,15 +96,6 @@ button {
   gap: 9px;
 }
 
-.mode-toggle {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
 .page-toggle {
   display: inline-flex;
   gap: 4px;
@@ -130,28 +121,6 @@ button {
   color: var(--navy);
 }
 
-.mode-toggle button {
-  min-height: 36px;
-  padding: 0 13px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.mode-toggle button.active {
-  background: var(--navy);
-  color: white;
-  box-shadow: 0 6px 14px rgba(16, 42, 76, 0.16);
-}
-
-.mode-action,
-.mode-export {
-  min-height: 42px;
-}
-
 .app {
   display: grid;
   grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
@@ -161,6 +130,114 @@ button {
 .app.presentation-app {
   display: block;
   min-height: calc(100vh - 72px);
+}
+
+.client-input-page {
+  width: min(100%, 1400px);
+  margin: 0 auto;
+  padding: 26px clamp(18px, 3vw, 34px) 40px;
+}
+
+.panel.client-input-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px;
+  margin-bottom: 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(196, 154, 67, 0.28);
+  background: linear-gradient(135deg, var(--navy), #1f4977);
+  color: white;
+  box-shadow: 0 18px 40px rgba(16, 42, 76, 0.16);
+}
+
+.panel.client-input-hero .client-label {
+  color: #f4d58a;
+}
+
+.panel.client-input-hero h1 {
+  margin: 0;
+  color: white;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.05;
+}
+
+.panel.client-input-hero span {
+  display: block;
+  margin-top: 8px;
+  color: #dbe6f2;
+  font-weight: 700;
+}
+
+.client-input-flow {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.client-input-group {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.client-input-group-heading {
+  padding: 4px 2px 0;
+}
+
+.client-input-group-heading h2 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 21px;
+}
+
+.client-input-group-heading p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.client-input-flow .policy-summary-page {
+  padding: 0;
+  background: transparent;
+}
+
+.client-input-flow .policy-summary-hero {
+  margin-bottom: 14px;
+}
+
+.client-input-flow .policy-summary-hero h1 {
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.page-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 26px clamp(22px, 4vw, 52px) 0;
+  padding: 22px 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(196, 154, 67, 0.28);
+  background: linear-gradient(135deg, var(--navy), #1f4977);
+  color: white;
+  box-shadow: 0 18px 40px rgba(16, 42, 76, 0.16);
+}
+
+.page-action-bar h1 {
+  margin: 0;
+  color: white;
+  font-size: clamp(26px, 4vw, 40px);
+  line-height: 1.05;
+}
+
+.retirement-export-message {
+  margin: 14px clamp(22px, 4vw, 52px) 0;
 }
 
 .sidebar {
@@ -273,9 +350,9 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  min-height: 48px;
-  padding: 0 14px;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 16px;
   color: var(--navy);
   font-size: 14px;
   font-weight: 900;
@@ -288,12 +365,13 @@ button {
 }
 
 .input-accordion summary::after {
+  flex: 0 0 24px;
   content: '+';
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: #f4f6f9;
   color: var(--muted);
@@ -305,6 +383,11 @@ button {
 }
 
 .accordion-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-left: auto;
 }
 
@@ -313,16 +396,19 @@ button {
 }
 
 .accordion-content {
-  padding: 0 14px 14px;
+  padding: 0 16px 16px;
 }
 
 .advanced-block {
-  margin-top: 10px;
+  margin-top: 12px;
   border-top: 1px solid var(--line);
-  padding-top: 9px;
+  padding-top: 12px;
 }
 
 .advanced-block summary {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
   color: var(--navy);
   font-size: 12px;
   font-weight: 900;
@@ -343,13 +429,16 @@ button {
 }
 
 .coverage-details-layout {
-  display: grid;
-  gap: 10px;
-  margin-top: 9px;
+  display: block;
+  margin-top: 10px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  padding-bottom: 2px;
 }
 
 .coverage-details-layout > p {
-  margin: 0;
+  margin: 0 0 12px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
@@ -371,12 +460,16 @@ button {
 
 .benefit-coverage-grid {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(130px, 1.2fr) repeat(2, minmax(76px, 100px));
-  gap: 7px;
-  align-items: end;
+  grid-template-columns: minmax(150px, 28%) minmax(220px, 42%) minmax(92px, 15%) minmax(92px, 15%);
+  gap: 8px 10px;
+  align-items: center;
+  width: max-content;
+  min-width: 620px;
+  margin-bottom: 12px;
 }
 
 .benefit-coverage-grid > span {
+  padding-bottom: 2px;
   color: var(--muted);
   font-size: 10px;
   font-weight: 900;
@@ -390,11 +483,12 @@ button {
 .benefit-coverage-row strong {
   align-self: center;
   color: var(--navy);
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .benefit-coverage-row .field {
-  gap: 3px;
+  gap: 0;
 }
 
 .benefit-coverage-row .field span {
@@ -412,6 +506,7 @@ button {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+  min-width: 0;
 }
 
 .section-header h2 {
@@ -419,6 +514,10 @@ button {
   font-size: 17px;
   color: var(--navy);
   letter-spacing: 0;
+}
+
+.section-header > div {
+  min-width: 0;
 }
 
 .micro-copy {
@@ -429,7 +528,7 @@ button {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px 16px;
 }
 
 .form-grid.compact {
@@ -437,12 +536,14 @@ button {
 }
 
 .input-compact-grid {
-  gap: 9px;
+  gap: 12px 14px;
 }
 
 .field {
   display: grid;
-  gap: 5px;
+  gap: 6px;
+  min-width: 0;
+  align-content: start;
 }
 
 .field span,
@@ -450,19 +551,22 @@ button {
   color: #475467;
   font-size: 11px;
   font-weight: 800;
+  line-height: 1.25;
 }
 
 .field input,
 .field select,
 textarea {
   width: 100%;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
-  min-height: 36px;
+  min-height: 38px;
   color: var(--ink);
   background: #ffffff;
-  padding: 0 9px;
+  padding: 0 10px;
   outline: none;
+  box-sizing: border-box;
 }
 
 .field input:focus,
@@ -475,7 +579,8 @@ textarea:focus {
 .input-shell {
   display: flex;
   align-items: center;
-  min-height: 36px;
+  min-width: 0;
+  min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
@@ -488,8 +593,10 @@ textarea:focus {
 }
 
 .input-shell input {
+  flex: 1 1 auto;
+  min-width: 0;
   border: 0;
-  min-height: 34px;
+  min-height: 36px;
   box-shadow: none;
 }
 
@@ -500,11 +607,12 @@ textarea:focus {
 }
 
 .toggle-row {
-  display: flex;
-  min-height: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 44px;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+  min-width: 0;
 }
 
 .toggle {
@@ -575,17 +683,18 @@ textarea:focus {
 }
 
 .compact-item-card {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px;
+  padding: 12px;
   background: #fbfcfe;
 }
 
 .compact-item-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: start;
+  gap: 14px;
+  align-items: center;
 }
 
 .compact-item-summary strong {
@@ -615,20 +724,31 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 6px;
-  margin-top: 9px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .compact-action {
-  min-height: 30px;
-  padding: 0 9px;
+  min-height: 34px;
+  padding: 0 11px;
   font-size: 12px;
 }
 
 .compact-edit-form {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+
+.policy-notes-field {
+  margin-top: 10px;
+}
+
+.policy-notes-field textarea {
+  min-height: 96px;
+  padding: 10px;
+  resize: vertical;
 }
 
 .policy-phase-badges {
@@ -900,6 +1020,49 @@ textarea:focus {
   font-weight: 800;
 }
 
+.policy-cash-review {
+  display: grid;
+  gap: 10px;
+}
+
+.policy-cash-review-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(90px, 0.8fr) minmax(76px, 0.6fr);
+  gap: 7px 8px;
+  align-items: center;
+}
+
+.policy-cash-review-table > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.policy-cash-review-row {
+  display: contents;
+}
+
+.policy-cash-review-row strong,
+.policy-cash-review-row b {
+  color: var(--navy);
+  font-size: 11px;
+}
+
+.policy-cash-review-row small,
+.policy-cash-review-row em {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.policy-cash-review-row em {
+  color: var(--danger);
+}
+
 .excluded-badge {
   display: inline-flex;
   align-items: center;
@@ -917,6 +1080,20 @@ textarea:focus {
 .review-panel,
 .follow-up-panel {
   margin-top: 16px;
+}
+
+.review-panel {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.review-panel .section-header {
+  flex-wrap: wrap;
+}
+
+.review-panel .section-header > div {
+  flex: 1 1 260px;
 }
 
 .income-status {
@@ -1033,7 +1210,15 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.review-actions .data-action-button {
+  max-width: 100%;
+  white-space: normal;
 }
 
 .review-date-row {
@@ -1051,11 +1236,15 @@ textarea:focus {
 
 .review-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .review-metric {
+  min-width: 0;
   padding: 12px;
 }
 
@@ -1069,6 +1258,7 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  min-width: 0;
 }
 
 .review-metric dt {
@@ -1082,6 +1272,7 @@ textarea:focus {
   font-size: 13px;
   font-weight: 900;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .review-status {
@@ -1100,6 +1291,7 @@ textarea:focus {
   flex-wrap: wrap;
   gap: 7px;
   margin-top: 8px;
+  min-width: 0;
 }
 
 .review-status span,
@@ -1114,6 +1306,8 @@ textarea:focus {
 
 .review-status span {
   padding: 6px 9px;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .changed-review-section {
@@ -1130,11 +1324,13 @@ textarea:focus {
 
 .change-groups {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+  min-width: 0;
 }
 
 .change-group {
+  min-width: 0;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2415,15 +2611,15 @@ textarea:focus {
   position: fixed;
   left: -10000px;
   top: 0;
-  width: 210mm;
+  width: 297mm;
   background: white;
   pointer-events: none;
   z-index: -1;
 }
 
 .export-report {
-  width: 190mm;
-  min-height: 277mm;
+  width: 277mm;
+  min-height: 190mm;
   padding: 0;
   background: #ffffff;
   color: #172033;
@@ -2500,12 +2696,12 @@ textarea:focus {
 .export-summary-grid,
 .export-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 7px;
 }
 
 .export-kpi-grid {
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .export-summary-box {
@@ -2578,7 +2774,7 @@ textarea:focus {
 
 .export-timeline-visual {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   margin-bottom: 8px;
   padding: 8px;
@@ -3749,8 +3945,6 @@ textarea:focus {
     justify-content: flex-start;
   }
 
-  .mode-toggle,
-  .mode-toggle button,
   .page-toggle,
   .page-toggle button {
     width: 100%;
@@ -3759,6 +3953,23 @@ textarea:focus {
   .sidebar,
   .dashboard {
     padding: 16px;
+  }
+
+  .client-input-page {
+    padding: 16px;
+  }
+
+  .client-input-hero,
+  .page-action-bar {
+    display: grid;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 18px;
+  }
+
+  .retirement-export-message {
+    margin-left: 16px;
+    margin-right: 16px;
   }
 
   .hero-panel,
@@ -3787,6 +3998,17 @@ textarea:focus {
     .form-grid,
     .form-grid.compact {
     grid-template-columns: 1fr;
+  }
+
+  .benefit-coverage-grid {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(70px, 1fr) minmax(110px, 1.45fr) repeat(2, minmax(54px, 0.75fr));
+    gap: 7px 6px;
+  }
+
+  .benefit-coverage-row strong {
+    font-size: 11px;
   }
 
   .policy-timeline-row {

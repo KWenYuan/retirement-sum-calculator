@@ -139,6 +139,7 @@ const createBasePolicySummaryPolicy = (overrides = {}) => ({
   maturityDate: '',
   maturityAge: '',
   cashValue: 0,
+  includeCashValueInRetirement: false,
   surrenderValue: 0,
   investmentValue: 0,
   maturityValue: 0,
@@ -187,6 +188,7 @@ function normalizePolicySummaryPolicyWithReport(policy = {}, index = 0) {
     }
     normalized[field] = normalizedAge;
   });
+  normalized.includeCashValueInRetirement = Boolean(source.includeCashValueInRetirement);
 
   normalized.currency = normalized.currency || 'SGD';
   normalized.premiumFrequency = normalizeOption(
@@ -234,6 +236,19 @@ function normalizePolicySummaryPolicyWithReport(policy = {}, index = 0) {
   });
 
   return { policy: normalized, cleanedFields };
+}
+
+export function getPolicyCashValueRetirementAssets(policies = []) {
+  return policies
+    .filter((policy) => Boolean(policy?.includeCashValueInRetirement) && toNumber(policy?.cashValue) > 0)
+    .map((policy) => ({
+      id: policy.id,
+      planName: policy.planName || 'Policy',
+      company: policy.company || '',
+      cashValue: toNumber(policy.cashValue),
+      currency: getPolicyCurrency(policy),
+      label: `Policy Cash Value - ${policy.planName || 'Policy'}`,
+    }));
 }
 
 export function calculatePolicyPremium(policy) {

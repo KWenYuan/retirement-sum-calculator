@@ -8,6 +8,9 @@ export const SCENARIOS = {
 
 export const defaultProfile = {
   clientName: 'Client Name',
+  dateOfBirth: '',
+  reviewDate: new Date().toLocaleDateString('en-CA'),
+  advisorName: 'Koh Wen Yuan',
   currentAge: 40,
   retirementAge: 65,
   monthlyIncome: 12000,
