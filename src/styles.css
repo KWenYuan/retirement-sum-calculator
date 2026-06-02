@@ -3767,6 +3767,120 @@ textarea:focus {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfe;
+  overflow: visible;
+}
+
+.policy-export-report .policy-timeline-pdf {
+  margin-top: 9px;
+  padding: 10px;
+}
+
+.policy-timeline-pdf .section-header {
+  margin-bottom: 8px;
+}
+
+.policy-timeline-pdf .section-header h2 {
+  font-size: 12px;
+}
+
+.policy-timeline-pdf .section-subtext {
+  margin-top: 2px;
+  font-size: 8px;
+  line-height: 1.25;
+}
+
+.policy-timeline-pdf .policy-timeline-legend {
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 7.5px;
+}
+
+.policy-timeline-pdf .policy-timeline-legend i {
+  width: 20px;
+  height: 5px;
+}
+
+.policy-timeline-pdf .policy-timeline-legend b,
+.policy-timeline-pdf .policy-status-badge {
+  min-height: 16px;
+  padding: 0 6px;
+  font-size: 7px;
+}
+
+.policy-timeline-pdf .policy-timeline-list {
+  gap: 6px;
+}
+
+.policy-timeline-pdf .policy-timeline-row {
+  grid-template-columns: 205px minmax(0, 1fr) 92px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.policy-timeline-pdf .policy-timeline-name strong {
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.policy-timeline-pdf .policy-timeline-name span {
+  margin-top: 2px;
+  font-size: 7.5px;
+  line-height: 1.25;
+}
+
+.policy-timeline-pdf .policy-timeline-name small {
+  margin-top: 3px;
+  font-size: 7.5px;
+  line-height: 1.25;
+}
+
+.policy-timeline-pdf .policy-timeline-track {
+  border-radius: 7px;
+}
+
+.policy-timeline-pdf .policy-timeline-bar {
+  min-width: 42px;
+  height: 15px;
+  padding: 0 6px;
+  font-size: 7px;
+  line-height: 15px;
+}
+
+.policy-timeline-pdf .policy-timeline-bar.benefit {
+  height: 9px;
+  padding: 0 5px;
+  font-size: 6.5px;
+  line-height: 9px;
+}
+
+.policy-timeline-pdf .timeline-bar-text {
+  font-size: 7px;
+}
+
+.policy-timeline-pdf .policy-timeline-axis {
+  grid-template-columns: 205px minmax(0, 1fr) 92px;
+  gap: 8px;
+  padding: 0 8px 3px;
+}
+
+.policy-timeline-pdf .policy-timeline-axis > div {
+  height: 22px;
+}
+
+.policy-timeline-pdf .policy-timeline-axis b {
+  top: 6px;
+  font-size: 7px;
+}
+
+.policy-timeline-empty {
+  margin: 0;
+  padding: 8px;
+  color: #667085;
+  font-size: 8px;
+  font-weight: 800;
 }
 
 .policy-timeline-pdf-heading {
