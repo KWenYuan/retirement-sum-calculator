@@ -1,5 +1,6 @@
 import {
   calculatePolicyTablePremiumTotalsByCurrency,
+  benefitCoverageDefinitions,
   formatCurrencyTotals,
   formatDisplayDate,
   formatPolicyCurrencyWithLabel,
@@ -16,6 +17,7 @@ const disclaimer = 'This policy summary is prepared based on information provide
 const PDF_POLICY_CHUNK_SIZE = 8;
 const PDF_TIMELINE_MAX_POLICIES_PER_PAGE = 5;
 const PDF_TIMELINE_MAX_ROW_HEIGHT = 560;
+const VERIFY_ITEM_LIMIT = 7;
 
 const exportPolicyRows = [
   { label: 'Company', get: (policy) => textValue(policy.company) },
@@ -53,6 +55,8 @@ export function PolicySummaryExportReport({
   const safeBenchmark = benchmark || {};
   const policyChunks = chunkPoliciesForPdf(safePolicies, PDF_POLICY_CHUNK_SIZE);
   const tablePremiumTotalsByCurrency = calculatePolicyTablePremiumTotalsByCurrency(safePolicies);
+  const keyFindings = buildKeyFindings({ policies: safePolicies, summary: safeSummary, tablePremiumTotalsByCurrency });
+  const dataToVerify = buildDataToVerify(safePolicies);
   const reviewDate = safeClient.reviewDate || new Date().toLocaleDateString('en-CA');
   const displayReviewDate = formatDisplayDate(reviewDate);
 
@@ -108,6 +112,25 @@ export function PolicySummaryExportReport({
         <section className="policy-export-summary-table policy-export-gap pdf-avoid-break">
           <h2>Policy Gap Summary</h2>
           <GapSummaryTable summary={safeSummary} benchmark={safeBenchmark} />
+        </section>
+
+        <section className="policy-export-insights-grid pdf-avoid-break">
+          <section className="policy-export-summary-table policy-export-key-findings">
+            <h2>Key Findings</h2>
+            <ol>
+              {keyFindings.map((finding) => <li key={finding}>{finding}</li>)}
+            </ol>
+          </section>
+
+          {dataToVerify.items.length > 0 && (
+            <section className="policy-export-summary-table policy-export-data-verify">
+              <h2>Data to Verify</h2>
+              <ul>
+                {dataToVerify.items.map((item) => <li key={item}>{item}</li>)}
+                {dataToVerify.remaining > 0 && <li>and {dataToVerify.remaining} more item{dataToVerify.remaining === 1 ? '' : 's'} to verify</li>}
+              </ul>
+            </section>
+          )}
         </section>
 
         <section className="policy-export-notes policy-export-notes-inline pdf-avoid-break">
@@ -208,6 +231,91 @@ function GapSummaryTable({ summary, benchmark }) {
   );
 }
 
+function buildKeyFindings({ policies, summary, tablePremiumTotalsByCurrency }) {
+  const findings = [`Existing policies reviewed: ${policies.length}`];
+  findings.push(`Total monthly premium: ${formatTotalsForFinding(tablePremiumTotalsByCurrency, 'monthlyPremium')}`);
+  findings.push(`Total annual premium: ${formatTotalsForFinding(tablePremiumTotalsByCurrency, 'annualPremium')}`);
+
+  const benchmarkCurrency = summary.benchmarkCurrency || summary.currencies?.[0] || 'SGD';
+  const benchmarkGap = summary.gapsByCurrency?.[benchmarkCurrency];
+  if (benchmarkGap?.hasBenchmark) {
+    findings.push(`Death coverage position: ${formatGapPosition(benchmarkGap.deathGap, benchmarkCurrency)}`);
+    findings.push(`CI coverage position: ${formatGapPosition(benchmarkGap.ciGap, benchmarkCurrency)}`);
+  } else {
+    findings.push('Death and CI coverage benchmarks should be verified before gap conclusions are finalised.');
+  }
+
+  const dataIssues = collectDataVerificationIssues(policies);
+  const missingPremiumCount = policies.filter((policy) => !getPremiumPeriod(policy).hasBar).length;
+  const missingCoverageCount = policies.filter((policy) => (
+    getBenefitCoverageDetails(policy).some((period) => !period.hasBar)
+  )).length;
+  if (missingPremiumCount > 0 || missingCoverageCount > 0) {
+    findings.push(`${missingPremiumCount} premium period${missingPremiumCount === 1 ? '' : 's'} and ${missingCoverageCount} coverage period${missingCoverageCount === 1 ? '' : 's'} need verification.`);
+  }
+  if (dataIssues.length > 0) {
+    findings.push('Some policy details should be checked against official insurer documents.');
+  }
+
+  return findings;
+}
+
+function buildDataToVerify(policies) {
+  const allItems = collectDataVerificationIssues(policies);
+  return {
+    items: allItems.slice(0, VERIFY_ITEM_LIMIT),
+    remaining: Math.max(0, allItems.length - VERIFY_ITEM_LIMIT),
+  };
+}
+
+function collectDataVerificationIssues(policies) {
+  const issues = [];
+  policies.forEach((policy, index) => {
+    const name = policy.planName || policy.policyName || policy.name || `Policy ${index + 1}`;
+    const premiumPeriod = getPremiumPeriod(policy);
+    if (!policy.startDate) issues.push(`${name}: policy start date missing`);
+    if (!isPdfValidAge(policy.ageInception)) issues.push(`${name}: policy start age missing`);
+    if (!policy.policyStatus || policy.policyStatus === 'Unknown') issues.push(`${name}: policy status missing`);
+    if (Number(policy.premiumAmount || 0) <= 0 && policy.premiumFrequency !== 'Single Premium') issues.push(`${name}: premium amount missing`);
+    if (!premiumPeriod.hasBar) issues.push(`${name}: premium period unknown`);
+    benefitCoverageDefinitions.forEach((benefit) => {
+      const raw = policy.benefits?.[benefit.key] || policy.benefitCoveragePeriods?.[benefit.key] || {};
+      const amount = raw.amount ?? policy[benefit.amountField];
+      const hasAmount = benefit.type === 'text'
+        ? Boolean(String(amount || '').trim())
+        : Number(amount || 0) > 0;
+      if (!hasAmount) return;
+      const startAge = Number(raw.startAge);
+      const endAge = Number(raw.endAge);
+      const hasStart = isPdfValidAge(raw.startAge);
+      const hasEnd = isPdfValidAge(raw.endAge);
+      if (!hasStart || !hasEnd) {
+        issues.push(`${name}: ${benefit.label} coverage period missing`);
+        return;
+      }
+      if (endAge > 120) issues.push(`${name}: ${benefit.label} end age ${endAge} looks unusually high`);
+      if (endAge < startAge) issues.push(`${name}: ${benefit.label} end age is before start age`);
+    });
+  });
+  return Array.from(new Set(issues));
+}
+
+function formatTotalsForFinding(totalsByCurrency = {}, key) {
+  const values = formatCurrencyTotals(totalsByCurrency, key, { includeZero: false });
+  return values.length > 0 ? values.join(' / ') : '-';
+}
+
+function formatGapPosition(gap, currency) {
+  if (gap === null || typeof gap === 'undefined') return 'Not calculated';
+  const label = gap >= 0 ? 'surplus' : 'shortfall';
+  return `${formatPolicyCurrencyWithLabel(Math.abs(gap), currency)} ${label}`;
+}
+
+function isPdfValidAge(value) {
+  if (value === '' || value === null || typeof value === 'undefined') return false;
+  return Number.isFinite(Number(value));
+}
+
 function PolicyTimelinePdf({ policies }) {
   const safePolicies = Array.isArray(policies) ? policies.filter(Boolean) : [];
   const rows = safePolicies.map((policy) => ({
@@ -296,7 +404,13 @@ function PolicyTimelinePdfPage({ pageRows, pageIndex, pageCount, ticks, minAge, 
                       style={{ left: `${((tick - minAge) / range) * 100}%` }}
                     />
                   ))}
-                  <PolicyTimelinePdfBar period={premium} type="premium" style={premium.hasBar ? toStyle(premium) : {}} />
+                  {premium.hasBar ? (
+                    <PolicyTimelinePdfBar period={premium} type="premium" style={toStyle(premium)} />
+                  ) : (
+                    <span className="policy-timeline-bar premium placeholder" style={{ left: '2%', width: '34%' }}>
+                      Premium period to verify
+                    </span>
+                  )}
                   {benefits.map((period, index) => (
                     <PolicyTimelinePdfBar
                       key={`${policy.id || policy.planName}-${period.key}`}
@@ -338,26 +452,25 @@ function getTimelinePdfRowHeight(row) {
 }
 
 function chunkTimelineRows(rows) {
+  const balancedPages = balancedChunks(rows, PDF_TIMELINE_MAX_POLICIES_PER_PAGE);
   const pages = [];
-  let currentPage = [];
-  let currentHeight = 0;
 
-  rows.forEach((row) => {
-    const rowHeight = getTimelinePdfRowHeight(row);
-    const pageIsFull = (
-      currentPage.length >= PDF_TIMELINE_MAX_POLICIES_PER_PAGE ||
-      (currentPage.length > 0 && currentHeight + rowHeight > PDF_TIMELINE_MAX_ROW_HEIGHT)
-    );
-    if (pageIsFull) {
-      pages.push(currentPage);
-      currentPage = [];
-      currentHeight = 0;
-    }
-    currentPage.push(row);
-    currentHeight += rowHeight;
+  balancedPages.forEach((page) => {
+    let currentPage = [];
+    let currentHeight = 0;
+    page.forEach((row) => {
+      const rowHeight = getTimelinePdfRowHeight(row);
+      if (currentPage.length > 0 && currentHeight + rowHeight > PDF_TIMELINE_MAX_ROW_HEIGHT) {
+        pages.push(currentPage);
+        currentPage = [];
+        currentHeight = 0;
+      }
+      currentPage.push(row);
+      currentHeight += rowHeight;
+    });
+    if (currentPage.length > 0) pages.push(currentPage);
   });
 
-  if (currentPage.length > 0) pages.push(currentPage);
   return pages;
 }
 
@@ -437,11 +550,24 @@ function PdfCurrencyTotalValue({ row, summary, tablePremiumTotalsByCurrency }) {
 
 function chunkPoliciesForPdf(policies, chunkSize = 4) {
   const safePolicies = Array.isArray(policies) ? policies.filter(Boolean) : [];
-  const chunks = [];
-  for (let index = 0; index < safePolicies.length; index += chunkSize) {
-    chunks.push(safePolicies.slice(index, index + chunkSize));
-  }
+  const chunks = balancedChunks(safePolicies, chunkSize);
   return chunks.length > 0 ? chunks : [[]];
+}
+
+function balancedChunks(items, maxChunkSize) {
+  const safeItems = Array.isArray(items) ? items.filter(Boolean) : [];
+  if (safeItems.length === 0) return [];
+  const pageCount = Math.max(1, Math.ceil(safeItems.length / maxChunkSize));
+  const baseSize = Math.floor(safeItems.length / pageCount);
+  const extra = safeItems.length % pageCount;
+  const chunks = [];
+  let cursor = 0;
+  for (let index = 0; index < pageCount; index += 1) {
+    const size = baseSize + (index < extra ? 1 : 0);
+    chunks.push(safeItems.slice(cursor, cursor + size));
+    cursor += size;
+  }
+  return chunks.filter((chunk) => chunk.length > 0);
 }
 
 function ExportPill({ label, value }) {

@@ -3876,6 +3876,12 @@ textarea:focus {
   line-height: 11px;
 }
 
+.policy-timeline-pdf .policy-timeline-bar.placeholder {
+  border: 1px dashed #98a2b3;
+  background: rgba(152, 162, 179, 0.24);
+  color: #475467;
+}
+
 .policy-timeline-pdf .timeline-bar-text {
   font-size: 9px;
 }
@@ -4074,6 +4080,27 @@ textarea:focus {
 
 .policy-export-gap {
   margin-top: 8px;
+}
+
+.policy-export-insights-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.policy-export-key-findings ol,
+.policy-export-data-verify ul {
+  margin: 0;
+  padding-left: 16px;
+  color: #475467;
+  font-size: 8px;
+  line-height: 1.42;
+}
+
+.policy-export-key-findings li,
+.policy-export-data-verify li {
+  margin: 2px 0;
 }
 
 .policy-export-gap-grid {
