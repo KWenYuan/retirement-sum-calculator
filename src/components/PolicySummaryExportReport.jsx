@@ -14,6 +14,8 @@ import {
 
 const disclaimer = 'This policy summary is prepared based on information provided and is for discussion purposes only. Please refer to the official policy contracts, benefit illustrations and insurer documents for exact benefits, exclusions, values, terms and conditions.';
 const PDF_POLICY_CHUNK_SIZE = 8;
+const PDF_TIMELINE_MAX_POLICIES_PER_PAGE = 5;
+const PDF_TIMELINE_MAX_ROW_HEIGHT = 560;
 
 const exportPolicyRows = [
   { label: 'Company', get: (policy) => textValue(policy.company) },
@@ -56,49 +58,62 @@ export function PolicySummaryExportReport({
 
   return (
     <section className="policy-export-report" ref={refNode}>
-      <header className="policy-export-header pdf-avoid-break">
-        <div>
-          <p>Personal Wealth Planning for</p>
-          <h1>{safeClient.clientName || 'Client'}</h1>
-          <span>Current as of {displayReviewDate}</span>
-          <small>Advisor: {safeClient.advisorName || '-'}</small>
-        </div>
-        <img src="/logo.png" alt="Advisor logo" />
-      </header>
+      <section className="policy-pdf-page policy-export-cover-page">
+        <header className="policy-export-header pdf-avoid-break">
+          <div>
+            <p>Personal Wealth Planning for</p>
+            <h1>{safeClient.clientName || 'Client'}</h1>
+            <span>Current as of {displayReviewDate}</span>
+            <small>Advisor: {safeClient.advisorName || '-'}</small>
+          </div>
+          <img src="/logo.png" alt="Advisor logo" />
+        </header>
 
-      <section className="policy-export-client pdf-avoid-break">
-        <ExportPill label="Date of birth" value={formatDisplayDate(safeClient.dateOfBirth)} />
-        <ExportPill label="Age" value={safeClient.age || '-'} />
-        <ExportPill label="Review date" value={displayReviewDate} />
-        <ExportPill label="Policies" value={safePolicies.length} />
-      </section>
-
-      <section className="policy-export-summary-grid pdf-avoid-break">
-        <section className="policy-export-summary-table">
-          <h2>Premium Summary</h2>
-          <CurrencySummaryTable summary={safeSummary} rows={[
-            ['Monthly Premium', 'monthlyPremium'],
-            ['Annual Premium', 'annualPremium'],
-            ['Single Premium', 'singlePremium'],
-          ]}
-          />
+        <section className="policy-export-client pdf-avoid-break">
+          <ExportPill label="Date of birth" value={formatDisplayDate(safeClient.dateOfBirth)} />
+          <ExportPill label="Age" value={safeClient.age || '-'} />
+          <ExportPill label="Review date" value={displayReviewDate} />
+          <ExportPill label="Policies" value={safePolicies.length} />
         </section>
 
-        <section className="policy-export-summary-table">
-          <h2>Coverage Summary</h2>
-          <CurrencySummaryTable summary={safeSummary} rows={[
-            ['Death', 'death'],
-            ['TPD', 'tpd'],
-            ['ECI', 'eci'],
-            ['CI', 'ci'],
-            ['Disability Income', 'disabilityIncome'],
-            ['Death (Accident)', 'deathAccident'],
-            ['TPD (Accident)', 'tpdAccident'],
-            ['Medical Reimbursement (Accident)', 'medicalReimbursementAccident'],
-            ['Hospital Income', 'hospitalIncome'],
-          ]}
-          />
-          <p className="policy-export-hospitalisation">Hospitalisation: {safeSummary.hospitalisationSummary}</p>
+        <section className="policy-export-summary-grid pdf-avoid-break">
+          <section className="policy-export-summary-table">
+            <h2>Premium Summary</h2>
+            <CurrencySummaryTable summary={safeSummary} rows={[
+              ['Monthly Premium', 'monthlyPremium'],
+              ['Annual Premium', 'annualPremium'],
+              ['Single Premium', 'singlePremium'],
+            ]}
+            />
+          </section>
+
+          <section className="policy-export-summary-table">
+            <h2>Coverage Summary</h2>
+            <CurrencySummaryTable summary={safeSummary} rows={[
+              ['Death', 'death'],
+              ['TPD', 'tpd'],
+              ['ECI', 'eci'],
+              ['CI', 'ci'],
+              ['Disability Income', 'disabilityIncome'],
+              ['Death (Accident)', 'deathAccident'],
+              ['TPD (Accident)', 'tpdAccident'],
+              ['Medical Reimbursement (Accident)', 'medicalReimbursementAccident'],
+              ['Hospital Income', 'hospitalIncome'],
+            ]}
+            />
+            <p className="policy-export-hospitalisation">Hospitalisation: {safeSummary.hospitalisationSummary}</p>
+          </section>
+        </section>
+
+        <section className="policy-export-summary-table policy-export-gap pdf-avoid-break">
+          <h2>Policy Gap Summary</h2>
+          <GapSummaryTable summary={safeSummary} benchmark={safeBenchmark} />
+        </section>
+
+        <section className="policy-export-notes policy-export-notes-inline pdf-avoid-break">
+          <h2>Notes / Disclaimer</h2>
+          <p>{notes || 'No notes entered.'}</p>
+          <p>{disclaimer}</p>
         </section>
       </section>
 
@@ -106,7 +121,7 @@ export function PolicySummaryExportReport({
 
       {policyChunks.map((chunk, index) => (
         <section
-          className="policy-export-section policy-export-table-section pdf-avoid-break"
+          className="policy-pdf-page policy-export-section policy-export-table-section policy-export-table-page"
           key={`policy-export-chunk-${index}`}
         >
           <h2>Policy Summary Table {index + 1} of {policyChunks.length}</h2>
@@ -119,16 +134,6 @@ export function PolicySummaryExportReport({
         </section>
       ))}
 
-      <section className="policy-export-summary-table policy-export-gap pdf-avoid-break">
-        <h2>Policy Gap Summary</h2>
-        <GapSummaryTable summary={safeSummary} benchmark={safeBenchmark} />
-      </section>
-
-      <section className="policy-export-notes pdf-avoid-break">
-        <h2>Notes / Disclaimer</h2>
-        <p>{notes || 'No notes entered.'}</p>
-        <p>{disclaimer}</p>
-      </section>
     </section>
   );
 }
@@ -211,6 +216,7 @@ function PolicyTimelinePdf({ policies }) {
     benefits: getBenefitCoverageDetails(policy).filter((period) => period.hasBar),
     status: getTimelineStatus(policy),
   }));
+  const timelinePages = chunkTimelineRows(rows);
   const barPeriods = rows.flatMap((row) => [row.premium, ...row.benefits]).filter((period) => period.hasBar && isValidAge(period.startAge) && isValidAge(period.endAge));
   const minAge = barPeriods.length > 0
     ? Math.max(0, Math.floor(Math.min(...barPeriods.map((period) => period.startAge)) / 5) * 5)
@@ -228,11 +234,34 @@ function PolicyTimelinePdf({ policies }) {
     };
   };
 
+  if (timelinePages.length === 0) {
+    timelinePages.push([]);
+  }
+
   return (
-    <section className="policy-export-section policy-timeline-section policy-timeline-pdf pdf-avoid-break">
+    <>
+      {timelinePages.map((pageRows, pageIndex) => (
+        <PolicyTimelinePdfPage
+          key={`policy-timeline-pdf-page-${pageIndex}`}
+          pageRows={pageRows}
+          pageIndex={pageIndex}
+          pageCount={timelinePages.length}
+          ticks={ticks}
+          minAge={minAge}
+          range={range}
+          toStyle={toStyle}
+        />
+      ))}
+    </>
+  );
+}
+
+function PolicyTimelinePdfPage({ pageRows, pageIndex, pageCount, ticks, minAge, range, toStyle }) {
+  return (
+    <section className="policy-pdf-page policy-export-section policy-timeline-section policy-timeline-pdf">
       <div className="section-header">
         <div>
-          <h2>Policy Timeline</h2>
+          <h2>Policy Timeline{pageCount > 1 ? ` (${pageIndex + 1} of ${pageCount})` : ''}</h2>
           <p className="section-subtext">Premium payable periods and coverage periods by policy.</p>
         </div>
       </div>
@@ -245,9 +274,9 @@ function PolicyTimelinePdf({ policies }) {
       </div>
       <div className="policy-timeline-shared">
         <div className="policy-timeline-list">
-          {rows.length === 0 && <p className="policy-timeline-empty">No policy timeline data entered.</p>}
-          {rows.map(({ policy, premium, benefits, status }) => {
-            const trackHeight = Math.max(50, 36 + (benefits.length * 16));
+          {pageRows.length === 0 && <p className="policy-timeline-empty">No policy timeline data entered.</p>}
+          {pageRows.map(({ policy, premium, benefits, status }) => {
+            const trackHeight = getTimelinePdfTrackHeight(benefits.length);
             return (
               <div
                 className={`policy-timeline-row ${getStatusClass(policy)}`}
@@ -298,6 +327,38 @@ function PolicyTimelinePdf({ policies }) {
       </div>
     </section>
   );
+}
+
+function getTimelinePdfTrackHeight(benefitCount) {
+  return Math.max(68, 44 + (benefitCount * 18));
+}
+
+function getTimelinePdfRowHeight(row) {
+  return getTimelinePdfTrackHeight(row.benefits.length) + 22;
+}
+
+function chunkTimelineRows(rows) {
+  const pages = [];
+  let currentPage = [];
+  let currentHeight = 0;
+
+  rows.forEach((row) => {
+    const rowHeight = getTimelinePdfRowHeight(row);
+    const pageIsFull = (
+      currentPage.length >= PDF_TIMELINE_MAX_POLICIES_PER_PAGE ||
+      (currentPage.length > 0 && currentHeight + rowHeight > PDF_TIMELINE_MAX_ROW_HEIGHT)
+    );
+    if (pageIsFull) {
+      pages.push(currentPage);
+      currentPage = [];
+      currentHeight = 0;
+    }
+    currentPage.push(row);
+    currentHeight += rowHeight;
+  });
+
+  if (currentPage.length > 0) pages.push(currentPage);
+  return pages;
 }
 
 function PolicyTimelinePdfBar({ period, type, style }) {

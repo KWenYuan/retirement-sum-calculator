@@ -3560,9 +3560,9 @@ textarea:focus {
 
 .policy-export-report {
   width: 1040px;
-  min-height: 790px;
+  min-height: 0;
   max-width: 1040px;
-  padding: 18px;
+  padding: 0;
   overflow: hidden;
   background: #ffffff;
   color: var(--ink);
@@ -3581,6 +3581,23 @@ textarea:focus {
 }
 
 .pdf-page-break {
+  break-before: page;
+  page-break-before: always;
+}
+
+.policy-pdf-page {
+  width: 100%;
+  margin: 0;
+  overflow: visible;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.policy-export-cover-page {
+  padding: 18px;
+}
+
+.policy-pdf-page + .policy-pdf-page {
   break-before: page;
   page-break-before: always;
 }
@@ -3662,7 +3679,7 @@ textarea:focus {
 
 .policy-export-section {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 0;
   overflow: hidden;
 }
 
@@ -3677,7 +3694,10 @@ textarea:focus {
 }
 
 .policy-export-table-section {
-  padding-top: 2px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .policy-export-table,
@@ -3686,15 +3706,15 @@ textarea:focus {
   table-layout: fixed;
   border-collapse: collapse;
   border: 1px solid var(--line);
-  font-size: 6.6px;
-  line-height: 1.15;
+  font-size: 7.6px;
+  line-height: 1.2;
 }
 
 .policy-export-table th,
 .policy-export-table td,
 .policy-export-timeline th,
 .policy-export-timeline td {
-  padding: 3px 4px;
+  padding: 4px 5px;
   border: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
@@ -3706,19 +3726,19 @@ textarea:focus {
 .policy-export-timeline thead th {
   background: var(--navy);
   color: #ffffff;
-  font-size: 6.6px;
+  font-size: 7.4px;
   font-weight: 900;
 }
 
 .policy-export-table th:first-child {
-  width: 12%;
+  width: 13%;
   background: #f8fafc;
   color: var(--navy);
   font-weight: 900;
 }
 
 .policy-export-table .policy-export-total-column {
-  width: 12%;
+  width: 13%;
   background: #fffaf0;
   color: var(--navy);
   font-weight: 900;
@@ -3771,108 +3791,108 @@ textarea:focus {
 }
 
 .policy-export-report .policy-timeline-pdf {
-  margin-top: 9px;
-  padding: 10px;
+  margin-top: 0;
+  padding: 14px;
 }
 
 .policy-timeline-pdf .section-header {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .policy-timeline-pdf .section-header h2 {
-  font-size: 12px;
+  font-size: 17px;
 }
 
 .policy-timeline-pdf .section-subtext {
-  margin-top: 2px;
-  font-size: 8px;
+  margin-top: 3px;
+  font-size: 10px;
   line-height: 1.25;
 }
 
 .policy-timeline-pdf .policy-timeline-legend {
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 7.5px;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 10px;
 }
 
 .policy-timeline-pdf .policy-timeline-legend i {
-  width: 20px;
-  height: 5px;
+  width: 27px;
+  height: 6px;
 }
 
 .policy-timeline-pdf .policy-timeline-legend b,
 .policy-timeline-pdf .policy-status-badge {
-  min-height: 16px;
-  padding: 0 6px;
-  font-size: 7px;
+  min-height: 21px;
+  padding: 0 8px;
+  font-size: 9px;
 }
 
 .policy-timeline-pdf .policy-timeline-list {
-  gap: 6px;
+  gap: 9px;
 }
 
 .policy-timeline-pdf .policy-timeline-row {
-  grid-template-columns: 205px minmax(0, 1fr) 92px;
-  gap: 8px;
+  grid-template-columns: 235px minmax(0, 1fr) 108px;
+  gap: 12px;
   align-items: center;
-  padding: 8px;
+  padding: 10px;
   break-inside: avoid;
   page-break-inside: avoid;
 }
 
 .policy-timeline-pdf .policy-timeline-name strong {
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.2;
 }
 
 .policy-timeline-pdf .policy-timeline-name span {
-  margin-top: 2px;
-  font-size: 7.5px;
+  margin-top: 3px;
+  font-size: 10px;
   line-height: 1.25;
 }
 
 .policy-timeline-pdf .policy-timeline-name small {
-  margin-top: 3px;
-  font-size: 7.5px;
+  margin-top: 4px;
+  font-size: 9.5px;
   line-height: 1.25;
 }
 
 .policy-timeline-pdf .policy-timeline-track {
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
 .policy-timeline-pdf .policy-timeline-bar {
-  min-width: 42px;
-  height: 15px;
-  padding: 0 6px;
-  font-size: 7px;
-  line-height: 15px;
+  min-width: 58px;
+  height: 19px;
+  padding: 0 8px;
+  font-size: 9px;
+  line-height: 19px;
 }
 
 .policy-timeline-pdf .policy-timeline-bar.benefit {
-  height: 9px;
-  padding: 0 5px;
-  font-size: 6.5px;
-  line-height: 9px;
+  height: 11px;
+  padding: 0 6px;
+  font-size: 7.5px;
+  line-height: 11px;
 }
 
 .policy-timeline-pdf .timeline-bar-text {
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .policy-timeline-pdf .policy-timeline-axis {
-  grid-template-columns: 205px minmax(0, 1fr) 92px;
-  gap: 8px;
-  padding: 0 8px 3px;
+  grid-template-columns: 235px minmax(0, 1fr) 108px;
+  gap: 12px;
+  padding: 0 10px 4px;
 }
 
 .policy-timeline-pdf .policy-timeline-axis > div {
-  height: 22px;
+  height: 28px;
 }
 
 .policy-timeline-pdf .policy-timeline-axis b {
-  top: 6px;
-  font-size: 7px;
+  top: 7px;
+  font-size: 9px;
 }
 
 .policy-timeline-empty {
@@ -4063,7 +4083,15 @@ textarea:focus {
 }
 
 .policy-export-notes {
+  margin-top: 0;
+}
+
+.policy-export-notes-inline {
   margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
 }
 
 .policy-export-notes p {

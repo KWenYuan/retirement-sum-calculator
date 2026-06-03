@@ -167,7 +167,7 @@ export function PolicySummary({
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1040 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-avoid-break', '.avoid-break'], before: ['.pdf-page-break', '.page-break'] },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-avoid-break', '.avoid-break'] },
       }).from(reportRef.current).save();
     } catch (pdfError) {
       console.error('Policy summary PDF export failed:', pdfError);
