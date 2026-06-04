@@ -56,7 +56,6 @@ export function ExportReport({
   const timelineRows = buildMilestoneRows({
     retirementTimeline,
   });
-  const timelineVisualRows = timelineRows.slice(0, 8);
   const cpf55 = includeCpf55 ? calculateCpfAge55Transfer(cpf, profile) : null;
   const cpfAge55Treatment = getCpfAge55ExcessTreatment(cpf);
   const srsSummary = buildSrsSummary(profile, srs);
@@ -109,6 +108,20 @@ export function ExportReport({
       </section>
 
       <section className="export-section avoid-break">
+        <h2>Projected Retirement Position</h2>
+        <div className="export-kpi-grid">
+          <SummaryBox label="Projected retirement amount" value={formatCurrency(retirementPoint.total)} />
+          <SummaryBox label="Required retirement amount" value={formatCurrency(needs.requiredAmount)} />
+          <SummaryBox label="Surplus / shortfall" value={formatCurrency(needs.surplusShortfall)} />
+          <SummaryBox label="Monthly investment to close gap" value={formatCurrency(needs.monthlyNeeded)} />
+        </div>
+        <div className="export-disclaimer-card">
+          <h3>Disclaimer / Notes</h3>
+          <p>{disclaimer}</p>
+        </div>
+      </section>
+
+      <section className="export-section page-break">
         <h2>Current Assets Today</h2>
         <SimpleTable
           headers={['Asset Category', 'Current Value', 'Notes']}
@@ -118,16 +131,6 @@ export function ExportReport({
       </section>
 
       <section className="export-section avoid-break">
-        <h2>Projected Retirement Position</h2>
-        <div className="export-kpi-grid">
-          <SummaryBox label="Projected retirement amount" value={formatCurrency(retirementPoint.total)} />
-          <SummaryBox label="Required retirement amount" value={formatCurrency(needs.requiredAmount)} />
-          <SummaryBox label="Surplus / shortfall" value={formatCurrency(needs.surplusShortfall)} />
-          <SummaryBox label="Monthly investment to close gap" value={formatCurrency(needs.monthlyNeeded)} />
-        </div>
-      </section>
-
-      <section className="export-section page-break">
         <h2>Asset Breakdown at Retirement</h2>
         <SimpleTable
           headers={['Asset type', 'Projected value']}
@@ -195,17 +198,7 @@ export function ExportReport({
 
       <section className="export-section page-break">
         <h2>Retirement Timeline</h2>
-        <div className="export-timeline-visual">
-          {timelineVisualRows.length === 0 ? (
-            <p className="export-note">No retirement timeline events entered.</p>
-          ) : timelineVisualRows.map(([age, type, event, amountIncome, duration], index) => (
-            <div className={`export-timeline-item ${type.toLowerCase().includes('income') ? 'income' : 'lump'}`} key={`${age}-${event}-${index}`}>
-              <span>Age {age}</span>
-              <strong>{event}</strong>
-              <small>{amountIncome} | {duration}</small>
-            </div>
-          ))}
-        </div>
+        <RetirementTimelinePdfVisual timeline={retirementTimeline} />
         <h3 className="export-subheading">Timeline Summary Table</h3>
         <SimpleTable headers={['Age', 'Type', 'Event', 'Amount / Income', 'Duration']} rows={timelineRows} />
       </section>
@@ -325,11 +318,6 @@ export function ExportReport({
           />
         </section>
       )}
-
-      <section className="export-section avoid-break">
-        <h2>Disclaimer</h2>
-        <p className="export-disclaimer">{disclaimer}</p>
-      </section>
     </article>
   );
 }
@@ -363,6 +351,177 @@ function SimpleTable({ headers, rows, emptyMessage = 'No records entered.' }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+function RetirementTimelinePdfVisual({ timeline }) {
+  const span = Math.max(1, timeline.endAge - timeline.startAge);
+  const ageToPercent = (age) => `${Math.min(100, Math.max(0, ((age - timeline.startAge) / span) * 100))}%`;
+  const visibleAgeGroups = Object.entries(timeline.lumpSumsByAge || {}).sort(([a], [b]) => Number(a) - Number(b));
+  const topStreamRows = assignTimelineStreamRows(
+    (timeline.incomeStreams || []).filter((stream) => isUpperTimelineStream(stream)),
+    span,
+  );
+  const bottomStreamRows = assignTimelineStreamRows(
+    (timeline.incomeStreams || []).filter((stream) => !isUpperTimelineStream(stream)),
+    span,
+  );
+  const topLaneCount = Math.max(1, topStreamRows.length);
+  const bottomLaneCount = Math.max(1, bottomStreamRows.length);
+  const showCashLegend = hasTimelineCategory(timeline, 'cash');
+  const showCpfLegend = hasTimelineCategory(timeline, 'cpf');
+  const showSrsLegend = hasTimelineCategory(timeline, 'srs');
+
+  if (visibleAgeGroups.length === 0 && (timeline.incomeStreams || []).length === 0) {
+    return <p className="export-note">No retirement timeline events entered.</p>;
+  }
+
+  return (
+    <div
+      className="export-timeline-print simple-retirement-timeline"
+      style={{
+        '--top-stream-rows': topLaneCount,
+        '--bottom-stream-rows': bottomLaneCount,
+      }}
+    >
+      <div className="export-timeline-print-header">
+        <p>One line showing lump sums, income starts, and important retirement ages.</p>
+        <TimelinePrintLegend showCash={showCashLegend} showCpf={showCpfLegend} showSrs={showSrsLegend} />
+      </div>
+
+      <div className="single-timeline" aria-label="Retirement timeline PDF visual">
+        <div className="milestone-guide-layer" aria-hidden="true">
+          {visibleAgeGroups.map(([age]) => (
+            <span
+              key={`pdf-guide-${age}`}
+              className="milestone-guide"
+              style={{ left: ageToPercent(Number(age)) }}
+            />
+          ))}
+        </div>
+
+        <div className="timeline-tooltip-layer">
+          {visibleAgeGroups.map(([age, events]) => {
+            const position = ((Number(age) - timeline.startAge) / span) * 100;
+            const edgeClass = position < 8 ? 'edge-left' : position > 92 ? 'edge-right' : '';
+            const startingStreams = getStartingTimelineStreams(timeline.incomeStreams || [], Number(age));
+            const lumpEvents = events.filter((event) => event.countsAsLumpSum !== false);
+            const lumpTotal = lumpEvents.reduce((total, event) => total + asNumber(event.amount), 0);
+            return (
+              <div
+                key={`pdf-card-${age}`}
+                className={`lump-tooltip ${edgeClass} ${getTimelineCategoryClass(events[0]?.category)}`}
+                style={{ left: ageToPercent(Number(age)) }}
+              >
+                <span className="lump-card">
+                  <b>Age {age}</b>
+                  <small>{lumpEvents.length > 0 ? `${lumpEvents.length} lump sum ${lumpEvents.length === 1 ? 'event' : 'events'}` : `${events.length} milestone ${events.length === 1 ? 'event' : 'events'}`}</small>
+                  {startingStreams.length > 0 && <small>{startingStreams.length} income {startingStreams.length === 1 ? 'stream' : 'streams'}</small>}
+                  <strong>Total: {formatCurrency(lumpTotal)}</strong>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="timeline-income-layer timeline-income-layer-top">
+          {topStreamRows.map((row, rowIndex) => (
+            <div className="income-lane-row" key={`pdf-top-row-${rowIndex}`}>
+              {row.map((stream) => (
+                <TimelinePrintStream
+                  key={stream.id}
+                  stream={stream}
+                  placement="top"
+                  rowIndex={rowIndex}
+                  rowCount={topLaneCount}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <div className="single-timeline-axis">
+          {(timeline.ticks || []).map((age) => (
+            <span
+              key={`pdf-age-${age}`}
+              className="single-age-marker"
+              style={{ left: ageToPercent(age) }}
+            >
+              <span />
+              <b>{age}</b>
+            </span>
+          ))}
+
+          {visibleAgeGroups.map(([age, events], index) => {
+            const position = ((Number(age) - timeline.startAge) / span) * 100;
+            const edgeClass = position < 8 ? 'edge-left' : position > 92 ? 'edge-right' : '';
+            return (
+              <span
+                key={`pdf-dot-${age}`}
+                className={`lump-group stack-${index % 2} ${edgeClass} ${getTimelineCategoryClass(events[0]?.category)}`}
+                style={{ left: ageToPercent(Number(age)) }}
+              >
+                <span className="lump-dot" />
+              </span>
+            );
+          })}
+        </div>
+
+        <div className="timeline-income-layer timeline-income-layer-bottom">
+          {bottomStreamRows.map((row, rowIndex) => (
+            <div className="income-lane-row" key={`pdf-bottom-row-${rowIndex}`}>
+              {row.map((stream) => (
+                <TimelinePrintStream
+                  key={stream.id}
+                  stream={stream}
+                  placement="bottom"
+                  rowIndex={rowIndex}
+                  rowCount={bottomLaneCount}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TimelinePrintLegend({ showCash, showCpf, showSrs }) {
+  return (
+    <div className="timeline-legend" aria-label="Timeline legend">
+      <span><i className="legend-dot legend-lump" /> Lump Sum</span>
+      <span><i className="legend-line legend-income" /> Income Stream</span>
+      {showCpf && <span><i className="legend-dot category-cpf" /> CPF</span>}
+      {showSrs && <span><i className="legend-dot category-srs" /> SRS</span>}
+      <span><i className="legend-dot category-policy" /> Policy</span>
+      <span><i className="legend-dot category-investment" /> Investment</span>
+      {showCash && <span><i className="legend-dot category-cash" /> Cash / Savings</span>}
+    </div>
+  );
+}
+
+function TimelinePrintStream({ stream, placement, rowIndex, rowCount }) {
+  const connectorHeight = placement === 'top'
+    ? (rowCount - rowIndex - 1) * 58 + 74
+    : rowIndex * 58 + 48;
+
+  return (
+    <div
+      className={`income-bracket income-bracket-${placement} ${getTimelineCategoryClass(stream.category)}`}
+      style={{
+        left: stream.left,
+        width: stream.width,
+        '--stream-connector-height': `${connectorHeight}px`,
+        '--stream-connector-top': placement === 'top' ? '0px' : `-${connectorHeight}px`,
+      }}
+    >
+      <span className="income-start-marker" />
+      <span className="income-label">
+        <span className="income-title">{stream.title}</span>
+        <small className="income-subtitle">{stream.startAge}-{stream.endAge} | {stream.duration}</small>
+      </span>
+    </div>
   );
 }
 
@@ -474,4 +633,55 @@ function buildInvestmentWithdrawalLabel(structure, projectedValue) {
     return `${formatCurrency(projectedValue / structure.withdrawalDuration)}/year, age ${structure.withdrawalStartAge}-${structure.withdrawalEndAge}`;
   }
   return `Lump sum at age ${structure.withdrawalStartAge}`;
+}
+
+function getStartingTimelineStreams(streams, age) {
+  return streams.filter((stream) => Math.round(stream.startAge) === Math.round(age));
+}
+
+function getTimelineCategoryClass(category = '') {
+  const normalized = category.toLowerCase();
+  if (normalized.includes('cpf')) return 'category-cpf';
+  if (normalized.includes('srs')) return 'category-srs';
+  if (normalized.includes('policy')) return 'category-policy';
+  if (normalized.includes('investment')) return 'category-investment';
+  if (normalized.includes('cash')) return 'category-cash';
+  return 'category-lump';
+}
+
+function isUpperTimelineStream(stream) {
+  const category = (stream.category || '').toLowerCase();
+  const title = (stream.title || '').toLowerCase();
+  return category.includes('srs') || title.includes('srs');
+}
+
+function hasTimelineCategory(timeline, category) {
+  const normalized = category.toLowerCase();
+  return [...(timeline.milestones || []), ...(timeline.incomeStreams || [])]
+    .some((item) => (item.category || '').toLowerCase().includes(normalized));
+}
+
+function assignTimelineStreamRows(streams, span) {
+  const labelPadding = Math.max(2, span * 0.08);
+  const sortedStreams = [...streams].sort((a, b) => a.startAge - b.startAge || a.endAge - b.endAge);
+  const rows = [];
+
+  sortedStreams.forEach((stream) => {
+    const candidate = {
+      ...stream,
+      collisionStart: stream.startAge - labelPadding,
+      collisionEnd: stream.endAge + labelPadding,
+    };
+    const row = rows.find((existingRow) => existingRow.every((item) => (
+      candidate.collisionEnd < item.collisionStart || candidate.collisionStart > item.collisionEnd
+    )));
+
+    if (row) {
+      row.push(candidate);
+    } else {
+      rows.push([candidate]);
+    }
+  });
+
+  return rows;
 }

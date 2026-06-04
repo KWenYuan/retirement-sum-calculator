@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import html2pdf from 'html2pdf.js';
-import { ShieldCheck } from 'lucide-react';
+import { Download, ShieldCheck } from 'lucide-react';
 import { Dashboard } from './components/Dashboard.jsx';
 import { AnnualReview } from './components/AnnualReview.jsx';
 import { ExportReport } from './components/ExportReport.jsx';
@@ -405,6 +405,7 @@ export default function App() {
                 <h1>Retirement Projection</h1>
               </div>
               <button className="export-button" type="button" onClick={exportPdf} disabled={isExporting}>
+                <Download size={18} />
                 {isExporting ? 'Generating PDF...' : 'Export Retirement PDF'}
               </button>
             </section>

@@ -3032,6 +3032,177 @@ textarea:focus {
   font-size: 9.5px;
 }
 
+.export-disclaimer-card {
+  margin-top: 9px;
+  padding: 8px 9px;
+  border: 1px solid #dfe6ef;
+  border-radius: 6px;
+  background: #fbfcfe;
+  color: #344054;
+}
+
+.export-disclaimer-card h3 {
+  margin: 0 0 4px;
+  color: var(--navy);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.export-disclaimer-card p {
+  margin: 0;
+  font-size: 8.7px;
+  line-height: 1.38;
+}
+
+.export-timeline-print {
+  margin-bottom: 8px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.export-timeline-print-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.export-timeline-print-header p {
+  margin: 0;
+  color: #667085;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.export-timeline-print .timeline-legend {
+  max-width: 690px;
+  gap: 6px 9px;
+  font-size: 8.6px;
+}
+
+.export-timeline-print .legend-dot {
+  width: 7px;
+  height: 7px;
+}
+
+.export-timeline-print .legend-line {
+  width: 16px;
+  height: 3px;
+}
+
+.export-timeline-print .single-timeline {
+  grid-template-rows:
+    104px
+    calc(var(--top-stream-rows, 1) * 58px)
+    52px
+    calc(var(--bottom-stream-rows, 1) * 58px);
+  gap: 12px;
+  padding: 12px;
+  border-radius: 7px;
+}
+
+.export-timeline-print .milestone-guide-layer {
+  inset: 12px;
+}
+
+.export-timeline-print .milestone-guide {
+  top: 78px;
+  height: calc(92px + (var(--top-stream-rows, 1) * 58px));
+}
+
+.export-timeline-print .timeline-tooltip-layer {
+  height: 104px;
+}
+
+.export-timeline-print .lump-tooltip {
+  width: 138px;
+  pointer-events: none;
+}
+
+.export-timeline-print .lump-card {
+  gap: 1px;
+  max-width: 138px;
+  padding: 6px 7px;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.export-timeline-print .lump-card b {
+  font-size: 9px;
+}
+
+.export-timeline-print .lump-card small {
+  font-size: 8px;
+  line-height: 1.18;
+}
+
+.export-timeline-print .lump-card strong {
+  font-size: 9px;
+}
+
+.export-timeline-print .timeline-income-layer {
+  grid-auto-rows: 58px;
+}
+
+.export-timeline-print .income-lane-row {
+  min-height: 58px;
+}
+
+.export-timeline-print .income-bracket {
+  top: 26px;
+  min-width: 62px;
+  height: 24px;
+  border-top-width: 3px;
+  border-left-width: 2px;
+  border-right-width: 2px;
+  pointer-events: none;
+}
+
+.export-timeline-print .income-bracket-bottom {
+  top: 7px;
+  border-bottom-width: 3px;
+}
+
+.export-timeline-print .income-label {
+  top: -31px;
+  max-width: min(170px, 180%);
+}
+
+.export-timeline-print .income-bracket-bottom .income-label {
+  top: 25px;
+}
+
+.export-timeline-print .income-title {
+  font-size: 8.7px;
+}
+
+.export-timeline-print .income-subtitle {
+  font-size: 8px;
+}
+
+.export-timeline-print .single-timeline-axis {
+  height: 4px;
+}
+
+.export-timeline-print .single-age-marker {
+  top: -7px;
+  font-size: 8.5px;
+  pointer-events: none;
+}
+
+.export-timeline-print .single-age-marker span {
+  height: 15px;
+  margin-bottom: 4px;
+}
+
+.export-timeline-print .lump-dot {
+  top: -8px;
+  width: 16px;
+  height: 16px;
+}
+
 .avoid-break {
   break-inside: avoid;
   page-break-inside: avoid;
