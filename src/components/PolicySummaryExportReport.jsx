@@ -61,7 +61,7 @@ export function PolicySummaryExportReport({
   const displayReviewDate = formatDisplayDate(reviewDate);
 
   return (
-    <section className="policy-export-report" ref={refNode}>
+    <section className="policy-export-report pdf-export-root policy-summary-export-report" ref={refNode}>
       <section className="policy-pdf-page policy-export-cover-page">
         <header className="policy-export-header pdf-avoid-break">
           <div>
@@ -70,7 +70,7 @@ export function PolicySummaryExportReport({
             <span>Current as of {displayReviewDate}</span>
             <small>Advisor: {safeClient.advisorName || '-'}</small>
           </div>
-          <img src="/logo.png" alt="Advisor logo" />
+          <img className="policy-export-logo pdf-report-logo" src="/logo.png" alt="Advisor logo" />
         </header>
 
         <section className="policy-export-client pdf-avoid-break">
@@ -133,7 +133,7 @@ export function PolicySummaryExportReport({
           )}
         </section>
 
-        <section className="policy-export-notes policy-export-notes-inline pdf-avoid-break">
+        <section className="policy-export-notes policy-export-notes-inline">
           <h2>Notes / Disclaimer</h2>
           <p>{notes || 'No notes entered.'}</p>
           <p>{disclaimer}</p>

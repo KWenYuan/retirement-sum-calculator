@@ -20,6 +20,7 @@ const asNumber = (value) => {
 };
 
 export function ExportReport({
+  refNode,
   profile,
   cpf,
   srs,
@@ -78,7 +79,7 @@ export function ExportReport({
   const cashProjectedValue = projectCash(cash, Math.max(0, asNumber(profile.retirementAge) - asNumber(profile.currentAge)));
 
   return (
-    <article className="export-report">
+    <article className="export-report pdf-export-root retirement-export-report" ref={refNode}>
       <header className="export-cover avoid-break">
         <div className="export-cover-content">
           <div>
@@ -91,7 +92,7 @@ export function ExportReport({
               <span>Prepared on: {exportDate}</span>
             </div>
           </div>
-          <img className="export-logo" src="/logo.png" alt="Advisor logo" />
+          <img className="export-logo pdf-report-logo" src="/logo.png" alt="Advisor logo" />
         </div>
       </header>
 
@@ -126,7 +127,7 @@ export function ExportReport({
         </div>
       </section>
 
-      <section className="export-section avoid-break">
+      <section className="export-section page-break">
         <h2>Asset Breakdown at Retirement</h2>
         <SimpleTable
           headers={['Asset type', 'Projected value']}

@@ -2718,18 +2718,22 @@ textarea:focus {
 
 .export-report-host {
   position: fixed;
-  left: -10000px;
+  left: -200vw;
   top: 0;
-  width: 297mm;
+  width: 1123px;
+  height: auto;
+  overflow: visible;
   background: white;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
 }
 
 .export-report {
-  width: 277mm;
-  min-height: 190mm;
+  width: 1040px;
+  min-height: 0;
+  max-width: 1040px;
   padding: 0;
+  overflow: visible;
   background: #ffffff;
   color: #172033;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -2752,9 +2756,56 @@ textarea:focus {
 
 .export-logo {
   justify-self: end;
+  width: auto;
+  height: auto;
   max-width: 110px;
   max-height: 62px;
   object-fit: contain;
+}
+
+.pdf-export-root {
+  background: #ffffff;
+  color: var(--ink);
+  box-sizing: border-box;
+  overflow: visible;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.pdf-export-root,
+.pdf-export-root * {
+  box-sizing: border-box;
+}
+
+.pdf-export-root .pdf-report-logo {
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  object-fit: contain !important;
+  flex: 0 0 auto !important;
+}
+
+.retirement-export-report .pdf-report-logo {
+  max-width: 110px !important;
+  max-height: 62px !important;
+}
+
+.policy-summary-export-report .pdf-report-logo {
+  max-width: 96px !important;
+  max-height: 44px !important;
+}
+
+.pdf-export-root .avoid-break,
+.pdf-export-root .pdf-avoid-break {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.pdf-export-root .page-break,
+.pdf-export-root .pdf-page-break {
+  break-before: page;
+  page-break-before: always;
 }
 
 .export-cover p {
@@ -3563,7 +3614,7 @@ textarea:focus {
   min-height: 0;
   max-width: 1040px;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   background: #ffffff;
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -3641,10 +3692,11 @@ textarea:focus {
 }
 
 .policy-export-header img {
-  width: auto;
-  max-width: 96px;
-  max-height: 44px;
-  object-fit: contain;
+  width: auto !important;
+  height: auto !important;
+  max-width: 96px !important;
+  max-height: 44px !important;
+  object-fit: contain !important;
 }
 
 .policy-export-client {

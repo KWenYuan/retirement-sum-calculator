@@ -464,29 +464,28 @@ export default function App() {
       )}
 
       <div className="export-report-host" aria-hidden="true">
-        <div ref={exportReportRef}>
-          <ExportReport
-            profile={profile}
-            cpf={cpf}
-            srs={srs}
-            policies={[]}
-            investments={investments}
-            cash={cash}
-            scenarioRate={scenarioRate}
-            retirementPoint={retirementPoint}
-            needs={needs}
-            retirementTimeline={retirementTimeline}
-            incomeSources={incomeSources}
-            annualReviewComparison={annualReviewComparison}
-            reviewChanges={reviewChanges}
-            followUpTasks={followUpTasks}
-            includeFollowUpTasksInPdf={includeFollowUpTasksInPdf}
-            advisorInsight={advisorInsight}
-            disclaimer={disclaimer}
-            exportDate={exportDate}
-            policyCashValueAssets={policyCashValueAssets}
-          />
-        </div>
+        <ExportReport
+          refNode={exportReportRef}
+          profile={profile}
+          cpf={cpf}
+          srs={srs}
+          policies={[]}
+          investments={investments}
+          cash={cash}
+          scenarioRate={scenarioRate}
+          retirementPoint={retirementPoint}
+          needs={needs}
+          retirementTimeline={retirementTimeline}
+          incomeSources={incomeSources}
+          annualReviewComparison={annualReviewComparison}
+          reviewChanges={reviewChanges}
+          followUpTasks={followUpTasks}
+          includeFollowUpTasksInPdf={includeFollowUpTasksInPdf}
+          advisorInsight={advisorInsight}
+          disclaimer={disclaimer}
+          exportDate={exportDate}
+          policyCashValueAssets={policyCashValueAssets}
+        />
       </div>
 
       <input
