@@ -257,7 +257,7 @@ button {
   box-shadow: 0 18px 40px rgba(16, 42, 76, 0.16);
 }
 
-.pwa-status-bar {
+.pwa-update-notice {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -268,76 +268,28 @@ button {
   color: var(--navy);
 }
 
-.pwa-status-bar strong,
-.pwa-status-bar span {
+.pwa-update-notice strong,
+.pwa-update-notice span {
   display: block;
 }
 
-.pwa-status-bar strong {
+.pwa-update-notice strong {
   font-size: 13px;
   line-height: 1.25;
 }
 
-.pwa-status-bar span {
+.pwa-update-notice span {
   margin-top: 2px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
 }
 
-.pwa-status-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.pwa-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid rgba(22, 112, 74, 0.22);
-  border-radius: 999px;
-  background: #eefaf4;
-  color: var(--success);
-  font-size: 11px;
-  font-weight: 900;
-}
-
-.pwa-update-button,
-.pwa-help-button {
+.pwa-update-button {
   min-height: 32px;
   font-size: 12px;
-}
-
-.pwa-update-button {
   border-color: rgba(196, 154, 67, 0.48);
   background: var(--gold-soft);
-}
-
-.pwa-install-help {
-  grid-column: 1 / -1;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfcfe;
-}
-
-.pwa-install-help h2 {
-  margin: 0 0 8px;
-  color: var(--navy);
-  font-size: 14px;
-}
-
-.pwa-install-help ol {
-  margin: 0;
-  padding-left: 20px;
-  color: #475467;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.55;
 }
 
 .page-action-bar h1 {
@@ -4358,12 +4310,8 @@ textarea:focus {
     justify-content: flex-start;
   }
 
-  .pwa-status-bar {
+  .pwa-update-notice {
     grid-template-columns: 1fr;
-  }
-
-  .pwa-status-actions {
-    justify-content: flex-start;
   }
 
   .presentation-hero-stats,
@@ -4389,12 +4337,11 @@ textarea:focus {
     justify-content: flex-start;
   }
 
-  .pwa-status-bar {
+  .pwa-update-notice {
     padding: 10px 16px;
   }
 
-  .pwa-status-actions,
-  .pwa-status-actions .ghost-button {
+  .pwa-update-notice .ghost-button {
     width: 100%;
   }
 
