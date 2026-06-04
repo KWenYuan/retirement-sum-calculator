@@ -6,6 +6,7 @@ import { AnnualReview } from './components/AnnualReview.jsx';
 import { ExportReport } from './components/ExportReport.jsx';
 import { FollowUpTasks } from './components/FollowUpTasks.jsx';
 import { PolicySummary } from './components/PolicySummary.jsx';
+import { PwaStatus } from './components/PwaStatus.jsx';
 import { RetirementIncomeSources } from './components/RetirementIncomeSources.jsx';
 import { RetirementTimeline } from './components/RetirementTimeline.jsx';
 import {
@@ -43,6 +44,7 @@ import {
 } from './utils/annualReview.js';
 import {
   getPolicyCashValueRetirementAssets,
+  clearPolicySummaryStorage,
   loadPolicySummaryFromStorage,
   savePolicySummaryToStorage,
 } from './utils/policySummary.js';
@@ -268,6 +270,13 @@ export default function App() {
     setDataError('');
   };
 
+  const clearAllLocalData = () => {
+    clearSavedClientData();
+    clearPolicySummaryStorage();
+    setDataMessage('All local app data cleared from this browser. The current screen remains unchanged until you reload or enter new data.');
+    setDataError('');
+  };
+
   const restoreState = (state) => {
     setProfile(state.profile);
     setCpf(state.cpf);
@@ -286,6 +295,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <PageNavigation currentPage={currentPage} setCurrentPage={setCurrentPage} />
+      <PwaStatus />
 
       {currentPage === 'input' && (
         <main className="client-input-page">
@@ -305,6 +315,7 @@ export default function App() {
               <div>
                 <h2>Client Data</h2>
                 <p>Import or export the full client file, including profile, policies, retirement inputs, and review data.</p>
+                <p className="security-note">Client data is stored locally on this device/browser. Export and store files securely. Clear data after use on shared devices.</p>
               </div>
               <div className="data-export-actions">
                 <button className="ghost-button data-action-button" type="button" onClick={requestImportFullClientData}>
@@ -312,6 +323,12 @@ export default function App() {
                 </button>
                 <button className="ghost-button data-action-button" type="button" onClick={exportFullClientData}>
                   Export Full Client Data
+                </button>
+                <button className="ghost-button data-action-button subtle" type="button" onClick={clearBrowserSavedData}>
+                  Clear Current Client Data
+                </button>
+                <button className="ghost-button data-action-button subtle" type="button" onClick={clearAllLocalData}>
+                  Clear All Local Data
                 </button>
               </div>
             </section>

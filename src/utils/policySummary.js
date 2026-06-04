@@ -718,6 +718,14 @@ export function loadPolicySummaryFromStorage() {
   }
 }
 
+export function clearPolicySummaryStorage() {
+  try {
+    localStorage.removeItem(POLICY_SUMMARY_STORAGE_KEY);
+  } catch {
+    // Storage is optional.
+  }
+}
+
 export function formatPolicyCurrency(value, currency = 'SGD') {
   return formatCurrencyExact(value, currency, { emptyAsZero: true });
 }
