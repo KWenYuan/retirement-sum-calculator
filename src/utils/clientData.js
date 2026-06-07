@@ -24,6 +24,15 @@ export const CLIENT_DATA_SCHEMA_VERSION = 2;
 export const CLIENT_DATA_STORAGE_KEY = 'retirement-sum-calculator-client-data';
 
 export const defaultAdvisorInsight = 'Client has strong income but most wealth is held in cash. Main opportunity is to improve long-term compounding and reduce inflation drag.';
+export const defaultAdvisorNotes = {
+  clientBackground: '',
+  concernsObjections: '',
+  buyingTriggers: '',
+  followUpNotes: '',
+  nextSessionFocus: '',
+  generalPrivateNotes: '',
+  lastUpdated: '',
+};
 
 export function buildExportPayload(data) {
   return {
@@ -74,6 +83,7 @@ export function buildFullClientExportPayload({ clientDataState, policySummaryDat
         previousReviewData: clientDataState.previousReviewData || null,
         followUpTasks: clientDataState.followUpTasks || [],
       },
+      advisorNotes: normalizeAdvisorNotes(clientDataState.advisorNotes),
       appSettings: {
         currentPage: 'input',
         selectedAge: clientDataState.selectedAge,
@@ -95,6 +105,7 @@ export function buildClientDataState({
   scenario,
   selectedAge,
   advisorInsight,
+  advisorNotes,
   followUpTasks = [],
   previousReviewData = null,
   includeFollowUpTasksInPdf = false,
@@ -114,6 +125,7 @@ export function buildClientDataState({
     scenario,
     selectedAge,
     advisorInsight,
+    advisorNotes: normalizeAdvisorNotes(advisorNotes),
     followUpTasks,
     previousReviewData,
     includeFollowUpTasksInPdf,
@@ -150,6 +162,7 @@ export function restoreCalculatorState(data = {}) {
       ? Number(data.selectedAge)
       : Number(data.profile?.retirementAge || defaultProfile.retirementAge),
     advisorInsight: typeof data.advisorInsight === 'string' ? data.advisorInsight : defaultAdvisorInsight,
+    advisorNotes: normalizeAdvisorNotes(data.advisorNotes),
     followUpTasks: normalizeTasks(data.followUpTasks),
     previousReviewData: data.previousReviewData || null,
     includeFollowUpTasksInPdf: Boolean(data.includeFollowUpTasksInPdf),
@@ -378,6 +391,7 @@ function restoreFullClientPayload(payload) {
     scenario: assumptions.scenario || appSettings.scenario || legacyRetirementState.scenario,
     selectedAge: assumptions.selectedAge ?? appSettings.selectedAge ?? legacyRetirementState.selectedAge,
     advisorInsight: assumptions.advisorInsight ?? legacyRetirementState.advisorInsight,
+    advisorNotes: data.advisorNotes ?? legacyRetirementState.advisorNotes,
     previousReviewData: annualReview.previousReviewData ?? legacyRetirementState.previousReviewData,
     followUpTasks: annualReview.followUpTasks ?? legacyRetirementState.followUpTasks,
     includeFollowUpTasksInPdf: assumptions.includeFollowUpTasksInPdf ?? legacyRetirementState.includeFollowUpTasksInPdf,
@@ -557,6 +571,19 @@ function sanitizeCash(cash = {}) {
     ...rest
   } = cash;
   return rest;
+}
+
+function normalizeAdvisorNotes(value = {}) {
+  return {
+    ...defaultAdvisorNotes,
+    clientBackground: typeof value.clientBackground === 'string' ? value.clientBackground : '',
+    concernsObjections: typeof value.concernsObjections === 'string' ? value.concernsObjections : '',
+    buyingTriggers: typeof value.buyingTriggers === 'string' ? value.buyingTriggers : '',
+    followUpNotes: typeof value.followUpNotes === 'string' ? value.followUpNotes : '',
+    nextSessionFocus: typeof value.nextSessionFocus === 'string' ? value.nextSessionFocus : '',
+    generalPrivateNotes: typeof value.generalPrivateNotes === 'string' ? value.generalPrivateNotes : '',
+    lastUpdated: typeof value.lastUpdated === 'string' ? value.lastUpdated : '',
+  };
 }
 
 function normalizeTasks(value) {

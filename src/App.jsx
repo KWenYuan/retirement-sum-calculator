@@ -31,6 +31,7 @@ import {
   buildClientDataState,
   buildFullClientExportPayload,
   clearSavedClientData,
+  defaultAdvisorNotes,
   defaultAdvisorInsight,
   downloadFullClientData,
   importFullClientData,
@@ -67,6 +68,39 @@ import {
 
 const disclaimer = 'This calculator is for illustration and discussion purposes only. Figures are based on assumptions entered and are not guaranteed. Future CPF retirement sums are estimated using an advisor-entered BRS growth assumption. Actual returns, CPF BRS, FRS, ERS, CPF LIFE payouts, CPF/SRS treatment, policy values, fees, withdrawals, taxation and market conditions may differ. Please refer to official policy documents and CPF/SRS guidelines where applicable.';
 
+const advisorNoteFields = [
+  {
+    key: 'clientBackground',
+    label: 'Client Background',
+    placeholder: 'Family situation, occupation context, personality, preferences, life stage.',
+  },
+  {
+    key: 'concernsObjections',
+    label: 'Concerns / Objections',
+    placeholder: 'Price-sensitive, wants to compare, spouse needs to approve, concerned about investment risk.',
+  },
+  {
+    key: 'buyingTriggers',
+    label: 'Buying Triggers / Motivation',
+    placeholder: 'Wants to retire early, recently became parent, worried about CI, wants to organise policies.',
+  },
+  {
+    key: 'followUpNotes',
+    label: 'Follow-up Notes',
+    placeholder: 'Send proposal, ask for CPF statement, review CI gap, check policy documents.',
+  },
+  {
+    key: 'nextSessionFocus',
+    label: 'Next Session Focus',
+    placeholder: 'Review CI shortfall and retirement projection.',
+  },
+  {
+    key: 'generalPrivateNotes',
+    label: 'General Private Notes',
+    placeholder: 'Anything else you want to remember.',
+  },
+];
+
 export default function App() {
   const savedState = useMemo(() => loadClientDataFromStorage(), []);
   const [currentPage, setCurrentPage] = useState('input');
@@ -79,6 +113,7 @@ export default function App() {
   const [scenario, setScenario] = useState(savedState?.scenario || 'balanced');
   const [selectedAge, setSelectedAge] = useState(savedState?.selectedAge || defaultProfile.retirementAge);
   const [advisorInsight, setAdvisorInsight] = useState(savedState?.advisorInsight || defaultAdvisorInsight);
+  const [advisorNotes, setAdvisorNotes] = useState(savedState?.advisorNotes || defaultAdvisorNotes);
   const [followUpTasks, setFollowUpTasks] = useState(savedState?.followUpTasks || []);
   const [previousReviewData, setPreviousReviewData] = useState(savedState?.previousReviewData || null);
   const [includeFollowUpTasksInPdf, setIncludeFollowUpTasksInPdf] = useState(savedState?.includeFollowUpTasksInPdf || false);
@@ -157,10 +192,11 @@ export default function App() {
     scenario,
     selectedAge: clampedSelectedAge,
     advisorInsight,
+    advisorNotes,
     followUpTasks,
     previousReviewData,
     includeFollowUpTasksInPdf,
-  }), [profile, cpf, srs, policyCashValueAssets, investments, cash, scenario, clampedSelectedAge, advisorInsight, followUpTasks, previousReviewData, includeFollowUpTasksInPdf]);
+  }), [profile, cpf, srs, policyCashValueAssets, investments, cash, scenario, clampedSelectedAge, advisorInsight, advisorNotes, followUpTasks, previousReviewData, includeFollowUpTasksInPdf]);
 
   const handlePolicySummaryDataChange = useCallback((nextData) => {
     setPolicySummaryData(nextData);
@@ -292,6 +328,7 @@ export default function App() {
     setScenario(state.scenario);
     setSelectedAge(state.selectedAge);
     setAdvisorInsight(state.advisorInsight);
+    setAdvisorNotes(state.advisorNotes || defaultAdvisorNotes);
     setFollowUpTasks(state.followUpTasks);
     setPreviousReviewData(state.previousReviewData);
     setIncludeFollowUpTasksInPdf(state.includeFollowUpTasksInPdf);
@@ -369,6 +406,8 @@ export default function App() {
               <InvestmentsSection investments={investments} setInvestments={setInvestments} profile={profile} scenarioRate={scenarioRate} />
               <CashSection cash={cash} setCash={setCash} />
             </section>
+
+            <AdvisorNotesSection advisorNotes={advisorNotes} setAdvisorNotes={setAdvisorNotes} />
 
             <AnnualReview
               previousReviewData={previousReviewData}
@@ -519,6 +558,51 @@ export default function App() {
         onChange={handleImportFullClientData}
       />
     </div>
+  );
+}
+
+function AdvisorNotesSection({ advisorNotes, setAdvisorNotes }) {
+  const hasNotes = advisorNoteFields.some(({ key }) => advisorNotes?.[key]?.trim());
+  const [isOpen, setIsOpen] = useState(hasNotes);
+  const updateNote = (key, value) => {
+    setAdvisorNotes((current) => ({
+      ...defaultAdvisorNotes,
+      ...current,
+      [key]: value,
+      lastUpdated: new Date().toLocaleDateString('en-CA'),
+    }));
+  };
+
+  return (
+    <details
+      className="input-accordion panel advisor-notes-panel"
+      open={isOpen}
+      onToggle={(event) => setIsOpen(event.currentTarget.open)}
+    >
+      <summary>
+        <span>Advisor Notes</span>
+        <b className="private-badge">Private — not shown to client</b>
+      </summary>
+      <div className="accordion-content">
+        <div className="advisor-notes-intro">
+          <p>Private notes for your own reference. These notes will not appear in client-facing pages or PDF reports.</p>
+          <p>These notes are stored in the Full Client JSON file. Keep the exported file secure.</p>
+          {advisorNotes?.lastUpdated && <span>Last updated: {advisorNotes.lastUpdated}</span>}
+        </div>
+        <div className="advisor-notes-grid">
+          {advisorNoteFields.map((field) => (
+            <label className="field advisor-note-field" key={field.key}>
+              <span>{field.label}</span>
+              <textarea
+                value={advisorNotes?.[field.key] || ''}
+                onChange={(event) => updateNote(field.key, event.target.value)}
+                placeholder={field.placeholder}
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+    </details>
   );
 }
 

@@ -25,7 +25,7 @@ const POLICY_STRUCTURES = [
 export function ProfileSection({ profile, setProfile }) {
   const update = (key, value) => setProfile((current) => ({ ...current, [key]: value }));
   return (
-    <AccordionSection title="Client Profile" defaultOpen>
+    <AccordionSection title="Client Profile" startOpen>
       <div className="form-grid compact input-compact-grid">
         <TextField label="Client name" value={profile.clientName} onChange={(value) => update('clientName', value)} />
         <TextField label="Date of birth" value={profile.dateOfBirth} onChange={(value) => update('dateOfBirth', value)} />
@@ -44,7 +44,7 @@ export function ProfileSection({ profile, setProfile }) {
 export function RetirementGoalSection({ profile, setProfile }) {
   const update = (key, value) => setProfile((current) => ({ ...current, [key]: value }));
   return (
-    <AccordionSection title="Retirement Assumptions" defaultOpen>
+    <AccordionSection title="Retirement Assumptions" startOpen>
       <div className="form-grid compact input-compact-grid">
         <NumberField label="Desired monthly income" prefix="$" value={profile.desiredMonthlyIncome} onChange={(value) => update('desiredMonthlyIncome', value)} />
         <NumberField label="Inflation rate" suffix="%" step={0.1} value={profile.inflationRate} onChange={(value) => update('inflationRate', value)} />
@@ -543,9 +543,9 @@ function getInvestmentPayoutSummary(projectedValue, structure) {
   };
 }
 
-function AccordionSection({ title, action, children, defaultOpen = false }) {
+function AccordionSection({ title, action, children, startOpen = false }) {
   return (
-    <details className="input-accordion panel" open={defaultOpen}>
+    <details className="input-accordion panel" open={startOpen}>
       <summary>
         <span>{title}</span>
         {action && <div className="accordion-action" onClick={(event) => event.preventDefault()}>{action}</div>}
