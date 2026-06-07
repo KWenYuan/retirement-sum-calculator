@@ -15,9 +15,10 @@ import {
   restorePolicySummaryData,
   validatePolicySummaryPayload,
 } from './policySummary.js';
+import { ACCEPTED_APP_NAMES, APP_NAME } from '../config/appBranding.js';
 
-export const CLIENT_DATA_APP_NAME = 'Retirement Sum Calculator';
-export const FULL_CLIENT_APP_NAME = 'Retirement Projection Studio';
+export const CLIENT_DATA_APP_NAME = APP_NAME;
+export const FULL_CLIENT_APP_NAME = APP_NAME;
 export const FULL_CLIENT_EXPORT_TYPE = 'Full Client Data';
 export const CLIENT_DATA_SCHEMA_VERSION = 2;
 export const CLIENT_DATA_STORAGE_KEY = 'retirement-sum-calculator-client-data';
@@ -122,13 +123,13 @@ export function buildClientDataState({
 export function validateImportPayload(payload) {
   if (
     !payload ||
-    payload.appName !== CLIENT_DATA_APP_NAME ||
+    !ACCEPTED_APP_NAMES.includes(payload.appName) ||
     typeof payload.schemaVersion === 'undefined' ||
     !payload.data
   ) {
     return {
       valid: false,
-      error: 'Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.',
+      error: `Invalid client data file. Please upload a valid ${APP_NAME} JSON file.`,
     };
   }
 
@@ -185,14 +186,14 @@ export async function importClientData(file) {
   if (!file) return null;
   const isJson = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
   if (!isJson) {
-    throw new Error('Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
+    throw new Error(`Invalid client data file. Please upload a valid ${APP_NAME} JSON file.`);
   }
 
   let payload;
   try {
     payload = JSON.parse(await file.text());
   } catch {
-    throw new Error('Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
+    throw new Error(`Invalid client data file. Please upload a valid ${APP_NAME} JSON file.`);
   }
 
   const validation = validateImportPayload(payload);
@@ -230,14 +231,14 @@ export async function importPreviousReviewData(file) {
   if (!file) return null;
   const isJson = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
   if (!isJson) {
-    throw new Error('Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
+    throw new Error(`Invalid client data file. Please upload a valid ${APP_NAME} JSON file.`);
   }
 
   let payload;
   try {
     payload = JSON.parse(await file.text());
   } catch {
-    throw new Error('Invalid client data file. Please upload a valid Retirement Sum Calculator JSON file.');
+    throw new Error(`Invalid client data file. Please upload a valid ${APP_NAME} JSON file.`);
   }
 
   const validation = validateImportPayload(payload);
@@ -348,7 +349,7 @@ async function readJsonFile(file) {
 function isFullClientPayload(payload) {
   return Boolean(
     payload &&
-    payload.appName === FULL_CLIENT_APP_NAME &&
+    ACCEPTED_APP_NAMES.includes(payload.appName) &&
     payload.exportType === FULL_CLIENT_EXPORT_TYPE &&
     payload.data,
   );

@@ -13,6 +13,7 @@ import {
   isCashIncludedInProjection,
 } from '../utils/projections.js';
 import { formatPolicyCurrencyWithLabel } from '../utils/policySummary.js';
+import { APP_NAME } from '../config/appBranding.js';
 
 const asNumber = (value) => {
   const parsed = Number(value);
@@ -82,7 +83,7 @@ export function ExportReport({
       <header className="export-cover avoid-break">
         <div className="export-cover-content">
           <div>
-            <p>Retirement Summary Report</p>
+            <p>{APP_NAME} | Retirement Projection Report</p>
             <h1>{profile.clientName || 'Client'}</h1>
             <div className="export-meta">
               <span>Prepared for: {profile.clientName || 'Client'}</span>

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { APP_DESCRIPTION, APP_NAME, APP_SHORT_NAME } from './src/config/appBranding.js';
 
 export default defineConfig({
   plugins: [
@@ -9,9 +10,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['logo.png', 'apple-touch-icon.png', 'pwa-icon-192.png', 'pwa-icon-512.png', 'offline.html'],
       manifest: {
-        name: 'Retirement Projection Studio',
-        short_name: 'Retirement Studio',
-        description: 'Offline-capable retirement and policy planning studio for client meetings.',
+        name: APP_NAME,
+        short_name: APP_SHORT_NAME,
+        description: APP_DESCRIPTION,
         display: 'standalone',
         orientation: 'landscape',
         theme_color: '#102a4c',

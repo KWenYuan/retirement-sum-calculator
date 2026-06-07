@@ -12,6 +12,7 @@ import {
   getPolicyTablePremiumValues,
   getPremiumPeriod,
 } from '../utils/policySummary.js';
+import { APP_NAME } from '../config/appBranding.js';
 
 const disclaimer = 'This policy summary is prepared based on information provided and is for discussion purposes only. Please refer to the official policy contracts, benefit illustrations and insurer documents for exact benefits, exclusions, values, terms and conditions.';
 const PDF_POLICY_CHUNK_SIZE = 8;
@@ -65,7 +66,7 @@ export function PolicySummaryExportReport({
       <section className="policy-pdf-page policy-export-cover-page">
         <header className="policy-export-header pdf-avoid-break">
           <div>
-            <p>Personal Wealth Planning for</p>
+            <p>{APP_NAME} | Policy Summary Report</p>
             <h1>{safeClient.clientName || 'Client'}</h1>
             <span>Current as of {displayReviewDate}</span>
             <small>Advisor: {safeClient.advisorName || '-'}</small>

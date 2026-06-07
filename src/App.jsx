@@ -48,6 +48,7 @@ import {
   loadPolicySummaryFromStorage,
   savePolicySummaryToStorage,
 } from './utils/policySummary.js';
+import { APP_NAME } from './config/appBranding.js';
 import {
   buildIncomeSources,
   buildRetirementTimeline,
@@ -89,6 +90,10 @@ export default function App() {
   const [dataError, setDataError] = useState('');
   const exportReportRef = useRef(null);
   const importInputRef = useRef(null);
+
+  useEffect(() => {
+    document.title = APP_NAME;
+  }, []);
 
   const scenarioRate = SCENARIOS[scenario].returnRate;
   const sharedPolicySummaryClient = useMemo(() => ({
@@ -526,7 +531,7 @@ function PageNavigation({ currentPage, setCurrentPage }) {
   return (
     <header className="mode-toolbar">
       <div className="mode-toolbar-title">
-        <strong>Retirement Projection Studio</strong>
+        <strong>{APP_NAME}</strong>
         <span>Client input, retirement projection and policy summary</span>
       </div>
       <div className="mode-toolbar-actions">

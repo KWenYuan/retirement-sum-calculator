@@ -642,6 +642,27 @@ export const buildRetirementTimeline = (state) => {
     }
   }
 
+  const cpfPayoutStartAge = asNumber(state.cpf?.cpfLifePayoutStartAge ?? state.cpf?.cpfPayoutStartAge) || 65;
+  const cpfMonthlyPayout = asNumber(state.cpf?.cpfLifeMonthlyPayout ?? state.cpf?.cpfMonthlyPayout);
+  if (
+    hasCpfProjectionData(state.cpf) &&
+    state.cpf?.includeInTotal !== false &&
+    cpfMonthlyPayout > 0 &&
+    cpfPayoutStartAge >= startAge &&
+    cpfPayoutStartAge <= endAge
+  ) {
+    addIncomeStream({
+      start: cpfPayoutStartAge,
+      end: endAge,
+      title: 'CPF LIFE / CPF payout',
+      category: 'CPF',
+      amountPerPeriod: cpfMonthlyPayout,
+      frequency: 'monthly',
+      description: `${formatCurrency(cpfMonthlyPayout)}/month from age ${cpfPayoutStartAge} onwards.`,
+      durationLabel: 'Lifetime',
+    });
+  }
+
   if (state.srs.enabled) {
     const withdrawalStart = asNumber(state.srs.withdrawalStartAge) || asNumber(state.srs.withdrawalAge);
     const duration = Math.max(1, asNumber(state.srs.withdrawalDurationYears) || 1);

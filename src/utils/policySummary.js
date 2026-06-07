@@ -1,4 +1,6 @@
-export const POLICY_SUMMARY_APP_NAME = 'Retirement Projection Studio';
+import { ACCEPTED_APP_NAMES, APP_NAME } from '../config/appBranding.js';
+
+export const POLICY_SUMMARY_APP_NAME = APP_NAME;
 export const POLICY_SUMMARY_MODULE = 'Policy Summary';
 export const POLICY_SUMMARY_SCHEMA_VERSION = 1;
 export const POLICY_SUMMARY_STORAGE_KEY = 'retirement-policy-summary-data';
@@ -620,7 +622,10 @@ export function buildPolicySummaryPayload(data) {
 }
 
 export function validatePolicySummaryPayload(payload) {
-  const validAppNames = [POLICY_SUMMARY_APP_NAME, `${POLICY_SUMMARY_APP_NAME} ${POLICY_SUMMARY_MODULE}`];
+  const validAppNames = [
+    ...ACCEPTED_APP_NAMES,
+    ...ACCEPTED_APP_NAMES.map((name) => `${name} ${POLICY_SUMMARY_MODULE}`),
+  ];
   return Boolean(
     payload &&
     validAppNames.includes(payload.appName) &&

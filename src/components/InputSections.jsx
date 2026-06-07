@@ -71,6 +71,14 @@ export function CpfSection({ cpf, setCpf, profile }) {
             <NumberField label="CPF MA" prefix="$" value={cpf.maBalance} onChange={(value) => update('maBalance', value)} />
             <NumberField label="Monthly CPF contribution" prefix="$" value={cpf.monthlyContribution} onChange={(value) => update('monthlyContribution', value)} />
           </div>
+          <details className="advanced-block">
+            <summary>CPF payout assumptions</summary>
+            <div className="form-grid compact input-compact-grid">
+              <NumberField label="CPF payout start age" value={cpf.cpfLifePayoutStartAge} onChange={(value) => update('cpfLifePayoutStartAge', value)} />
+              <NumberField label="CPF monthly payout" prefix="$" value={cpf.cpfLifeMonthlyPayout} onChange={(value) => update('cpfLifeMonthlyPayout', value)} />
+            </div>
+            <p className="field-helper">CPF payout is shown as a retirement income stream on the timeline. It is separate from CPF age 55 excess treatment.</p>
+          </details>
           <div className="cpf-treatment-panel">
             <span>CPF excess at age 55</span>
             <div className="choice-buttons" role="group" aria-label="CPF excess at age 55 treatment">

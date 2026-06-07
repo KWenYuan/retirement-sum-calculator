@@ -1,8 +1,8 @@
-# Retirement Projection Studio
+# Wealth Planning Studio
 
 ## 1. Project Overview
 
-Retirement Projection Studio is a private advisor calculator for retirement planning discussions.
+Wealth Planning Studio is a private advisor calculator for retirement planning discussions.
 
 It helps show clients their current assets, projected retirement assets, retirement timeline, expected lump sums, income streams, CPF age 55 event, SRS withdrawals, policies, investments, cash planning, and retirement income sources.
 
@@ -27,7 +27,7 @@ Use this app to:
 Open Terminal and run:
 
 ```bash
-cd ~/Desktop/"Retirement Sum Calculator"
+cd ~/Desktop/"Wealth Planning Studio"
 npm install
 npm run dev
 ```
@@ -348,4 +348,3 @@ git push --force-with-lease origin main
 ## 17. Disclaimer
 
 This calculator is for illustration and discussion only. It does not guarantee returns, CPF values, policy values, payouts, tax treatment, or future retirement outcomes. Actual results depend on CPF rules, policy terms, market performance, fees, withdrawals, inflation, and client circumstances.
-
