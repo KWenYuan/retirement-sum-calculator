@@ -40,6 +40,25 @@ const policyStatuses = ['In-force', 'Lapsed', 'Matured', 'Cancelled', 'Pending',
 const payStatuses = ['Paying', 'Fully paid', 'Waived', 'Lapsed', 'In-force', 'Unknown'];
 const coverageStatuses = ['Active', 'Ended', 'Pending', 'Unknown'];
 const premiumPayableTypes = ['Fixed term', 'To age', 'Whole life / ongoing', 'Single premium', 'Fully paid', 'Unknown'];
+
+export function sortPoliciesByStartDate(policies) {
+  return policies
+    .map((policy, index) => ({ policy, index }))
+    .sort((entryA, entryB) => {
+      const timestampA = Date.parse(entryA.policy.startDate);
+      const timestampB = Date.parse(entryB.policy.startDate);
+      const hasValidDateA = Number.isFinite(timestampA);
+      const hasValidDateB = Number.isFinite(timestampB);
+
+      if (!hasValidDateA && !hasValidDateB) return entryA.index - entryB.index;
+      if (!hasValidDateA) return 1;
+      if (!hasValidDateB) return -1;
+
+      return (timestampA - timestampB) || (entryA.index - entryB.index);
+    })
+    .map(({ policy }) => policy);
+}
+
 const policyRows = [
   { label: 'Company', get: (policy) => textValue(policy.company) },
   { label: 'Policy No.', get: (policy) => textValue(policy.policyNumber) },
@@ -100,6 +119,7 @@ export function PolicySummary({
   const selectedTimelinePolicy = policies.find((policy) => policy.id === selectedTimelinePolicyId) || policies[0] || null;
   const exportDate = new Date().toLocaleDateString('en-CA');
   const displayClient = useMemo(() => mergeClientDetails(client, sharedClient), [client, sharedClient]);
+  const sortedPolicies = useMemo(() => sortPoliciesByStartDate(policies), [policies]);
   const effectiveBenchmark = useMemo(
     () => getPolicyBenchmarkFromClientProfile(benchmark, displayClient),
     [benchmark, displayClient],
@@ -259,7 +279,7 @@ export function PolicySummary({
               </div>
             </summary>
             <div className="accordion-content compact-item-list">
-              {policies.map((policy) => (
+              {sortedPolicies.map((policy) => (
                 <PolicySummaryCard
                   key={policy.id}
                   policy={policy}
