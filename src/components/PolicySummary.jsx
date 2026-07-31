@@ -25,6 +25,7 @@ import {
   getBenefitAmountDisplay,
   getBenefitCoverageDetails,
   getPolicyBenchmarkFromClientProfile,
+  getPolicyStartTimestamp,
   getPolicyTablePremiumValues,
   getPremiumPeriod,
   importPolicySummaryData,
@@ -45,14 +46,12 @@ export function sortPoliciesByStartDate(policies) {
   return policies
     .map((policy, index) => ({ policy, index }))
     .sort((entryA, entryB) => {
-      const timestampA = Date.parse(entryA.policy.startDate);
-      const timestampB = Date.parse(entryB.policy.startDate);
-      const hasValidDateA = Number.isFinite(timestampA);
-      const hasValidDateB = Number.isFinite(timestampB);
+      const timestampA = getPolicyStartTimestamp(entryA.policy.startDate);
+      const timestampB = getPolicyStartTimestamp(entryB.policy.startDate);
 
-      if (!hasValidDateA && !hasValidDateB) return entryA.index - entryB.index;
-      if (!hasValidDateA) return 1;
-      if (!hasValidDateB) return -1;
+      if (timestampA === null && timestampB === null) return entryA.index - entryB.index;
+      if (timestampA === null) return 1;
+      if (timestampB === null) return -1;
 
       return (timestampA - timestampB) || (entryA.index - entryB.index);
     })
