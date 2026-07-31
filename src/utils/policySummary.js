@@ -580,6 +580,11 @@ export function getBenefitAmountDisplay(policy, benefitKey) {
   return formatBenefitAmount(policy, definition);
 }
 
+export function getPolicyStartTimestamp(value) {
+  const parsed = parseDisplayDate(toSafeText(value).trim());
+  return parsed ? parsed.getTime() : null;
+}
+
 export function formatDisplayDate(value) {
   const text = toSafeText(value).trim();
   if (!text) return '-';
