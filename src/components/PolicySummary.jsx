@@ -115,10 +115,10 @@ export function PolicySummary({
   const [selectedTimelinePolicyId, setSelectedTimelinePolicyId] = useState(null);
   const importRef = useRef(null);
   const reportRef = useRef(null);
-  const selectedTimelinePolicy = policies.find((policy) => policy.id === selectedTimelinePolicyId) || policies[0] || null;
   const exportDate = new Date().toLocaleDateString('en-CA');
   const displayClient = useMemo(() => mergeClientDetails(client, sharedClient), [client, sharedClient]);
   const sortedPolicies = useMemo(() => sortPoliciesByStartDate(policies), [policies]);
+  const selectedTimelinePolicy = policies.find((policy) => policy.id === selectedTimelinePolicyId) || sortedPolicies[0] || null;
   const effectiveBenchmark = useMemo(
     () => getPolicyBenchmarkFromClientProfile(benchmark, displayClient),
     [benchmark, displayClient],
@@ -313,7 +313,7 @@ export function PolicySummary({
       {showReport && (
         <PolicySummaryReport
           client={displayClient}
-          policies={policies}
+          policies={sortedPolicies}
           summary={summary}
           benchmark={effectiveBenchmark}
           notes={notes}
@@ -326,7 +326,7 @@ export function PolicySummary({
         <PolicySummaryExportReport
           refNode={reportRef}
           client={displayClient}
-          policies={policies}
+          policies={sortedPolicies}
           summary={summary}
           benchmark={effectiveBenchmark}
           notes={notes}
